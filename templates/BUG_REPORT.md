@@ -1,0 +1,12 @@
+# Bug Report
+- ID:
+- Faz:
+- Severity: Critical / High / Medium / Low
+- Tenant/role/test user:
+- Environment/build:
+- Preconditions:
+- Steps to reproduce:
+- Expected:
+- Actual:
+- Evidence (trace/screenshot/log without PII):
+- Regression test added:
