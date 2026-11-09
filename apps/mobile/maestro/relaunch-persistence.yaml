@@ -1,0 +1,19 @@
+# Faz 07 — Maestro duman akışı 2: uygulama yeniden açma kalıcılığı.
+# Giriş → uygulama sonlandır → yeniden başlat → gelen kutusu doğrudan açılır
+# (token SecureStore'da; relaunch kabulü).
+appId: com.teknikflow.mobile
+name: relaunch-persistence-smoke
+---
+- launchApp
+- tapOn:
+    id: login-email
+- inputText: ${TECH_EMAIL}
+- tapOn:
+    id: login-password
+- inputText: ${TECH_PASSWORD}
+- tapOn:
+    id: login-submit
+- assertVisible: 'Tümü'
+- stopApp
+- launchApp
+- assertVisible: 'Tümü'

@@ -281,21 +281,24 @@ export class AuthService {
     }
 
     const env = getEnv();
-    const accessToken = this.jwt.signAccessToken(
-      {
-        sub: user.id,
-        mid: membership.id,
-        tid: membership.tenantId,
-        role: membership.role.key,
-      },
-      env.AUTH_ACCESS_TOKEN_TTL_SECONDS,
-    );
+    // Faz 07: refresh ailesi ÖNCE kurulur — erişim tokenı `fam` claim'iyle
+    // aileyi taşır (cihaz yönetimi: "bu cihaz" işareti + aile iptali).
     const refresh = await this.sessions.createRefreshToken({
       userId: user.id,
       membershipId: membership.id,
       ip: meta.ip,
       userAgent: meta.userAgent,
     });
+    const accessToken = this.jwt.signAccessToken(
+      {
+        sub: user.id,
+        mid: membership.id,
+        tid: membership.tenantId,
+        role: membership.role.key,
+        fam: refresh.familyId,
+      },
+      env.AUTH_ACCESS_TOKEN_TTL_SECONDS,
+    );
     return {
       kind: 'mobile' as const,
       user,

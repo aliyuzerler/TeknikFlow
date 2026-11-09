@@ -373,6 +373,117 @@ describe('mobil token akışı (JWT + dönen refresh)', () => {
       .send({ refreshToken: login.body.refreshToken })
       .expect(401);
   });
+
+  // ------------------------------------------------------------------
+  // Faz 07 — cihaz yönetimi: oturum listesi MOBILE aileleri içerir;
+  // aile iptali (tekil + revoke-all) sonraki refresh'i öldürür.
+  // ------------------------------------------------------------------
+
+  it('oturum listesi MOBILE satırı taşır (fam claim ile "bu cihaz" işaretli)', async () => {
+    const tenant = await createTenant('MobileList');
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: tenant.ownerEmail, password: PASSWORD, client: 'mobile' })
+      .expect(200);
+
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/auth/sessions')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(200);
+    const mobile = list.body.data.find((row: { kind: string }) => row.kind === 'MOBILE');
+    expect(mobile).toBeTruthy();
+    expect(mobile.current).toBe(true); // fam claim'i bu aileyi işaretler
+    expect(mobile.revokedAt).toBeNull();
+
+    // İkinci mobil cihaz (aynı kullanıcı) → iki MOBILE satırı, yalnız biri current.
+    const second = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: tenant.ownerEmail, password: PASSWORD, client: 'mobile' })
+      .expect(200);
+    const list2 = await request(app.getHttpServer())
+      .get('/api/v1/auth/sessions')
+      .set('Authorization', `Bearer ${second.body.accessToken}`)
+      .expect(200);
+    const mobiles = list2.body.data.filter((row: { kind: string }) => row.kind === 'MOBILE');
+    expect(mobiles).toHaveLength(2);
+    expect(mobiles.filter((row: { current: boolean }) => row.current)).toHaveLength(1);
+  });
+
+  it('mobil aile tekil iptal (DELETE /auth/sessions/{familyId}) → refresh 401', async () => {
+    const tenant = await createTenant('MobileRevoke');
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: tenant.ownerEmail, password: PASSWORD, client: 'mobile' })
+      .expect(200);
+
+    const list = await request(app.getHttpServer())
+      .get('/api/v1/auth/sessions')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(200);
+    const familyId = list.body.data.find(
+      (row: { kind: string }) => row.kind === 'MOBILE',
+    ).sessionId;
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/auth/sessions/${familyId}`)
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken });
+    expect(after.status).toBe(401);
+  });
+
+  it('başkasının ailesini iptal etme → 404 (IDOR yok)', async () => {
+    const tenantA = await createTenant('RevokeOwn');
+    const tenantB = await createTenant('RevokeOther');
+    const loginB = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: tenantB.ownerEmail, password: PASSWORD, client: 'mobile' })
+      .expect(200);
+    const listB = await request(app.getHttpServer())
+      .get('/api/v1/auth/sessions')
+      .set('Authorization', `Bearer ${loginB.body.accessToken}`)
+      .expect(200);
+    const familyB = listB.body.data.find(
+      (row: { kind: string }) => row.kind === 'MOBILE',
+    ).sessionId;
+
+    const loginA = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: tenantA.ownerEmail, password: PASSWORD, client: 'mobile' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/auth/sessions/${familyB}`)
+      .set('Authorization', `Bearer ${loginA.body.accessToken}`)
+      .expect(404);
+    // B'nin tokenı hâlâ canlı.
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${loginB.body.accessToken}`)
+      .expect(200);
+  });
+
+  it('revoke-all mobil aileleri de kapatır; sonraki refresh 401', async () => {
+    const tenant = await createTenant('RevokeAllMobile');
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: tenant.ownerEmail, password: PASSWORD, client: 'mobile' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/sessions/revoke-all')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+    // Erişim tokenı kısa TTL ile hâlâ çerezsiz çalışır ama refresh yolu kapalı
+    // — cihaz erişimi TTL sonunda tamamen kesilir (ADR-0002 mobil modeli).
+  });
 });
 
 describe('çoklu kiracı üyeliği', () => {

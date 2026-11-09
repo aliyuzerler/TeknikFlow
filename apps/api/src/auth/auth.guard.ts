@@ -75,6 +75,7 @@ export class AuthGuard implements CanActivate {
         email: user.emailNormalized,
         displayName: user.displayName,
         platformAdmin: user.platformAdmin,
+        ...(typeof claims.fam === 'string' && claims.fam ? { familyId: claims.fam } : {}),
         permissions: new Set<string>(),
       };
     }
@@ -111,6 +112,7 @@ export class AuthGuard implements CanActivate {
       email: user.emailNormalized,
       displayName: user.displayName,
       platformAdmin: false,
+      ...(typeof claims.fam === 'string' && claims.fam ? { familyId: claims.fam } : {}),
       membershipId: membership.id,
       tenantId: membership.tenantId,
       tenantName: membership.tenant.name,

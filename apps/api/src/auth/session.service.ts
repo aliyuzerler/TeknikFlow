@@ -128,17 +128,27 @@ export class SessionService {
       where: { id: sessionId, revokedAt: null },
       data: { revokedAt: new Date(), revokedReason: reason },
     });
-    return result.count > 0;
+    if (result.count > 0) return true;
+    // Faz 07: kimlik aile kimliği olabilir (mobil cihaz satırı) — ailenin
+    // TAMAMINI iptal et (aktif + rotasyonlu satırlar; sonraki refresh geçersiz).
+    const family = await this.prisma.refreshTokenFamily.updateMany({
+      where: { familyId: sessionId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
+    return family.count > 0;
   }
 
-  /** Oturumları listeler (kullanıcının kendisi için; iptaller dahil). */
-  async listUserSessions(userId: string, currentSessionId?: string) {
+  /** Oturumları listeler (kullanıcının kendisi için; iptaller dahil).
+   *  Faz 07: MOBILE satırlar — refresh token aileleri (gruplanmış; en yeni
+   *  rotasyon meta'yı taşır, aile etkinliği "rotasyonlanmamış + iptal
+   *  edilmemiş" satır varlığıdır). WEB + MOBILE tek listede döner. */
+  async listUserSessions(userId: string, currentSessionId?: string, currentFamilyId?: string) {
     const rows = await this.prisma.session.findMany({
       where: { userId, kind: 'WEB' },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    return rows.map((r) => ({
+    const views = rows.map((r) => ({
       sessionId: r.id,
       kind: r.kind,
       createdAt: r.createdAt.toISOString(),
@@ -149,10 +159,44 @@ export class SessionService {
       createdIp: r.createdIp,
       userAgent: r.userAgent,
     }));
+
+    const familyRows = await this.prisma.refreshTokenFamily.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const byFamily = new Map<string, typeof familyRows>();
+    for (const row of familyRows) {
+      const bucket = byFamily.get(row.familyId) ?? [];
+      bucket.push(row);
+      byFamily.set(row.familyId, bucket);
+    }
+    const mobileViews = [...byFamily.entries()].map(([familyId, bucket]) => {
+      const latest = bucket[0]!; // createdAt desc — ilk satır en yeni rotasyon
+      const activeRow = bucket.find((r) => r.revokedAt === null && r.rotatedAt === null);
+      const active = activeRow !== undefined;
+      const revokedSource = bucket.find((r) => r.revokedAt !== null);
+      return {
+        sessionId: familyId,
+        kind: 'MOBILE' as const,
+        createdAt: latest.createdAt.toISOString(),
+        // Aile lastUsedAt taşımaz — son rotasyon zamanı kullanılan en yakın
+        // dürüst göstergedir (her başarılı yenileme yeni satır üretir).
+        lastUsedAt: latest.createdAt.toISOString(),
+        expiresAt: latest.expiresAt.toISOString(),
+        revokedAt: active ? null : (revokedSource?.revokedAt?.toISOString() ?? null),
+        current: familyId === currentFamilyId,
+        createdIp: latest.createdIp,
+        userAgent: latest.userAgent,
+      };
+    });
+
+    return [...views, ...mobileViews];
   }
 
-  /** revoke-all-sessions: kullanıcının (verilen türdeki) tüm oturumlarını iptal eder. */
-  async revokeAllWebSessions(userId: string, exceptSessionId?: string): Promise<number> {
+  /** revoke-all-sessions: kullanıcının tüm oturumlarını iptal eder.
+   *  Faz 07: mobil refresh aileleri DAHİL (tüm cihazlar kilitlenir). */
+  async revokeAllUserSessions(userId: string, exceptSessionId?: string): Promise<number> {
     const result = await this.prisma.session.updateMany({
       where: {
         userId,
@@ -162,6 +206,10 @@ export class SessionService {
       },
       data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
     });
-    return result.count;
+    const families = await this.prisma.refreshTokenFamily.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
+    });
+    return result.count + families.count;
   }
 }

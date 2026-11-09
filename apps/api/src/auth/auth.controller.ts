@@ -265,6 +265,7 @@ export class AuthController {
         mid: rotated.membershipId,
         tid: membership.tenantId,
         role: membership.role.key,
+        fam: rotated.familyId,
       },
       env.AUTH_ACCESS_TOKEN_TTL_SECONDS,
     );
@@ -281,7 +282,9 @@ export class AuthController {
   @Get('sessions')
   @UseGuards(AuthGuard)
   async listSessions(@CurrentAuth() ctx: RequestAuthContext) {
-    return { data: await this.sessions.listUserSessions(ctx.userId, ctx.sessionId) };
+    return {
+      data: await this.sessions.listUserSessions(ctx.userId, ctx.sessionId, ctx.familyId),
+    };
   }
 
   @Delete('sessions/:id')
@@ -292,8 +295,14 @@ export class AuthController {
     @Req() req: Request,
   ) {
     // Yalnız KENDİ oturumu iptal edebilir (IDOR yok).
-    const own = await this.prisma.session.findFirst({ where: { id, userId: ctx.userId } });
-    if (!own) {
+    // Faz 07: mobil satırlar aile kimliğiyle eşleşir (refresh_token_families).
+    const ownSession = await this.prisma.session.findFirst({ where: { id, userId: ctx.userId } });
+    const ownFamily = ownSession
+      ? null
+      : await this.prisma.refreshTokenFamily.findFirst({
+          where: { familyId: id, userId: ctx.userId },
+        });
+    if (!ownSession && !ownFamily) {
       throw new NotFoundException({ message: 'Oturum bulunamadı', code: 'NOT_FOUND' });
     }
     await this.sessions.revokeSession(id, 'user_revoked');
@@ -316,7 +325,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const revoked = await this.sessions.revokeAllWebSessions(ctx.userId);
+    const revoked = await this.sessions.revokeAllUserSessions(ctx.userId);
     clearSessionCookies(res);
     await this.audit.log({
       tenantId: ctx.tenantId,

@@ -12,3 +12,4 @@ infra/native/bin
 infra/native/.data
 infra/native/.state
 *.md
+apps/web/next-env.d.ts

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 — Phase 07: Mobile foundation and technician inbox
+
+- Expo mobil temel: React Navigation (native-stack) — oturum durumuna göre Giriş ya da uygulama akışı (Gelen Kutusu → İş Emri Detayı → Hesap); açılış/yükleme/boş/hata durumları; derin bağlantı `tfmobile://wo/{id}` → detay (geçersiz yol null — hiçbir ekrana taşınmaz).
+- Güvenli oturum (ADR-0002 mobil akışı): tokenlar `expo-secure-store` (Keychain/Keystore) — SQLite/düz depo YOK; login (client: mobile + çoklu üyelik seçimi), erişim tokenı 401'de otomatik refresh + tek tekrar, refresh ölümünde temiz çıkış; logout sunucu refresh iptali + tüm yerel veri silme.
+- Çevrimdışı açılış ayrıştırması: `me()` ağ hatası → son meta ile çevrimdışı oturum sürer (token silinmez); 401/contract → refresh yolu; "uygulama yeniden açma" kabulü bu yolla kanıtlı.
+- Offline-first gelen kutusu: veri kaynağı yerel SQLite (expo-sqlite; sürücü soyutlaması — testler bellek-içi sürücü); pull `mine=true` (atanmış-filtre kabulü), kiracı değişiminde eski kiracı verisi fiziksel silinir; filtreler (Tümü/Aktif/Planlı/Tamamlanan); SLA rozetleri + planlama penceresi (Europe/Istanbul).
+- Dürüst senkron şeridi: idle/syncing/synced/offline/error + kuyruk sayısı; netinfo ile bağlantı geri gelince otomatik çekme, pull-to-refresh; asla sahte "senkronize" yok (ADR-0004 §6).
+- Outbox altyapı (Faz 08 yürütücüleri hazır bekler): idempotency anahtarı + queued→syncing→done|failed makinesi + üstel backoff (5s→5dk cap); `sync_outbox`/`sync_cursor`/`sync_meta` şeması OFFLINE_SYNC.md setine göre.
+- API ön koşulu — cihaz yönetimi: mobil JWT'ye opsiyonel `fam` claim'i (login + rotasyon aile kimliği taşır); `GET /auth/sessions` WEB + MOBILE satırları (gruplu aileler, "bu cihaz" işareti); `DELETE /sessions/:id` aile düşürür; `revoke-all` mobil aileleri DAHIL kapatır → sonraki refresh 401 (IDOR 404 + aile ölümü entegrasyon kanıtlı); sözleşme `SessionListResponseSchema`.
+- Mobil test altyapısı: jest-expo + jest 29 + RNTL 13 (React 19 çifti) — 12 dosya 71 test (istemci 13, oturum 8, cache/outbox 9, senkron 5, ekranlar/bileşenler 34, format/linking 6); Maestro akış dosyaları (login→inbox, relaunch kalıcılığı) — emülatörsüz ortamda yürütme BLOCKED (belgelendi).
+- Web E2E regresyonu yok (38/38); Storybook 67/67; toplam 415 birim (+71) + 139 entegrasyon (+4).
+- TEST-07 kapısı: PASS (`docs/reports/PHASE-07-REPORT.md`).
+
 ## 0.6.0 — Phase 06: Dispatch board, team capacity and scheduling
 
 - Sevk motoru (ADR-0008): çakışma/kapasite/SLA/yetenek/serbest-slot kurallarının TEK gerçekliği veritabanı erişimi olmayan saf modülde (`dispatch-engine.ts` — 36 birim test); schedule ucu, doğrudan ASSIGNED geçişi ve PATCH schedule üç mutasyon yüzeyi de aynı motorü çağırır.

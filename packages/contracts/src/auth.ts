@@ -159,3 +159,9 @@ export const SessionViewSchema = z.object({
   userAgent: z.string().nullable(),
 });
 export type SessionView = z.infer<typeof SessionViewSchema>;
+
+/** GET /auth/sessions yanıtı — WEB oturumları + MOBILE refresh aileleri (Faz 07). */
+export const SessionListResponseSchema = z.object({
+  data: z.array(SessionViewSchema),
+});
+export type SessionListResponse = z.infer<typeof SessionListResponseSchema>;

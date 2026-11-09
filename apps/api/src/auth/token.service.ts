@@ -30,6 +30,10 @@ export interface AccessTokenClaims {
   mid: string;
   tid: string;
   role: string;
+  /** Faz 07: mobil refresh ailesi kimliği — cihaz yönetimi (oturum
+   *  listelemede "bu cihaz" işareti + aile iptali). Platform admin
+   *  ve eski tokenlarda yoktur (opsiyonel claim). */
+  fam?: string;
   iat: number;
   exp: number;
 }

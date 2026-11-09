@@ -1,0 +1,20 @@
+# Faz 07 — Maestro duman akışı 1: giriş → gelen kutusu.
+# Koşum: gerçek cihaz/emülatör + çalışan API (EXPO_PUBLIC_API_URL) gerektirir.
+# Bu ortamda (Linux sandbox) emülatör yoktur → BELGELENDİ: yürütme Faz 16
+# cihaz çiftliğinde ya da yerel geliştirmede yapılır (akış hazır).
+appId: com.teknikflow.mobile
+name: login-inbox-smoke
+---
+- launchApp
+- assertVisible:
+    id: login-email
+- tapOn:
+    id: login-email
+- inputText: ${TECH_EMAIL}
+- tapOn:
+    id: login-password
+- inputText: ${TECH_PASSWORD}
+- tapOn:
+    id: login-submit
+- assertVisible: 'Tümü'
+- assertVisible: 'Henüz iş yok'

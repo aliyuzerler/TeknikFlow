@@ -16,6 +16,9 @@ export interface RequestAuthContext {
   platformAdmin: boolean;
   /** Web oturum kimliği (revoke hedefi). */
   sessionId?: string;
+  /** Faz 07 — mobil refresh ailesi kimliği (JWT `fam` claim'i;
+   *  oturum listelemede "bu cihaz" işareti + aile iptal hedefi). */
+  familyId?: string;
   /** Aktif üyelik bağlamı — platform admin oturumlarında yoktur. */
   membershipId?: string;
   tenantId?: string;

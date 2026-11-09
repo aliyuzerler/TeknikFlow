@@ -1,5 +1,5 @@
 # ADR-0004: Mobil Çevrimdışı ve Senkronizasyon Modeli
-- Status: Proposed
+- Status: Accepted (Phase 07 uygulaması — temel: güvenli oturum, offline cache, outbox altyapısı; saha eylemleri Phase 08)
 - Date: 2026-11-09
 
 ## Decision dahil Context için özet
@@ -34,4 +34,4 @@
 Outbox payload'ları tenant+kullanıcı kimlikli ve sunucuda üyelik doğrulamasından geçer. Cihaz kaybında oturum iptali (revoke) tüm veri erişimini keser.
 
 ## Migration/rollback considerations
-Phase 07-08'de kurulur. Outbox şeması ilk mobil fazda oluşturulur; protokol değişiklikleri versiyonlu sync contract ile yönetilir.
+Phase 07'de kuruldu: SQLite şeması (`cached_work_order`, `sync_outbox`, `sync_cursor`, `sync_meta`) + sürücü soyutlaması (expo-sqlite üretim / bellek-içi test) + outbox durum makinesi + backoff; token'lar SecureStore (Keychain/Keystore). Outbox operasyon tipleri Faz 08'de yürütücülerle bağlanır; protokol değişiklikleri versiyonlu sync contract ile yönetilir.

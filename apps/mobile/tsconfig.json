@@ -6,8 +6,9 @@
     "lib": ["ES2022"],
     "jsx": "react-jsx",
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "types": ["node", "jest"]
   },
-  "include": ["App.tsx", "index.ts", "src"],
+  "include": ["App.tsx", "index.ts", "src", "jest.setup.ts"],
   "exclude": ["node_modules"]
 }
