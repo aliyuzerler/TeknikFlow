@@ -2,27 +2,56 @@
   "name": "@teknikflow/ui-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Web tasarım sistemi — bileşenler Faz 02'de (marka sistemi, UI shell, Storybook) eklenir",
+  "description": "TeknikFlow web tasarım sistemi — React bileşenleri + Storybook (Faz 02)",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src/ui-web.css"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./styles.css": "./src/ui-web.css"
   },
   "scripts": {
+    "dev": "storybook dev -p 6006",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run -c vitest.config.ts"
+    "test": "vitest run -c vitest.unit.config.ts",
+    "storybook:build": "storybook build -o storybook-static --stats-json",
+    "storybook:serve": "node scripts/serve-static.mjs storybook-static 6010",
+    "test:storybook": "vitest run -c vitest.stories.config.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@storybook/addon-a11y": "^10.6.6",
+    "@storybook/addon-vitest": "10.6.6",
+    "@storybook/react": "10.6.6",
+    "@storybook/react-vite": "^10.6.6",
     "@teknikflow/config": "workspace:*",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.13.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "jsdom": "^31.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "storybook": "^10.6.6",
     "typescript": "~5.9.3",
     "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@teknikflow/design-tokens": "workspace:^"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }

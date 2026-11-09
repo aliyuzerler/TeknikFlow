@@ -2,11 +2,31 @@
   "name": "@teknikflow/design-tokens",
   "version": "0.1.0",
   "private": true,
-  "description": "TeknikFlow ortak tasarım token'ları (renk, boşluk, tipografi)",
+  "description": "TeknikFlow ortak tasarım tokenıları — tek kaynak tokens.css + üretilmiş TS eşdeğeri",
   "files": [
+    "dist",
     "tokens.css"
   ],
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./tokens.css": "./tokens.css"
+  },
+  "devDependencies": {
+    "@teknikflow/config": "workspace:^",
+    "@types/node": "^24.13.6",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "generate": "node scripts/generate-tokens.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run -c vitest.config.ts"
   }
 }

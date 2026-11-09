@@ -33,3 +33,6 @@ expo/.git/
 *.log
 .idea/
 .vscode/
+
+# Storybook statik derlemesi (CI'da üretilir, commit edilmez)
+**/storybook-static/

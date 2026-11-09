@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 — Phase 02: Brand system, UI shell and Storybook
+
+- Marka sistemi: SVG marka işareti (mavi→teal geçişli "ileri akan T" yolu) + wordmark; 28 ikon; Inter Variable tipografi.
+- Tek kaynaklı tasarım token zinciri: `tokens.css` (77 token) → üretici → CSS değişkenleri + `src/tokens.ts` (React Native teması dahil). Üretici Prettier API ile kararlı çıktı verir; senkron test bayat üretimi engeller; bilinmeyen token adı hata verir.
+- WCAG AA: 8 token değeri kontrast eşiklerine göre revize edildi (muted, subtle, header-muted, placeholder, warning-strong, teal-600, dot-warning, dot-success) — 24 çift denetimi raporda.
+- `@teknikflow/ui-web`: duyarlı AppShell (masaüstü kenar çubuğu + ≤720px mobil ARIA çekmecesi, odak tuzağı/ESC/odak geri dönüşü, atlama bağlantısı) + ortak bileşenler (Button, Input/FormField, Card/Panel, MetricCard, DataTable, StatusBadge, ConfirmDialog, SideDrawer, Empty/Skeleton/Error, PageHeader, Breadcrumbs, Avatar).
+- Storybook 10 (addon-a11y + addon-vitest): 9 dosyada 34 story; 34 etkileşim testi CI'da koşar; statik derleme doğrulandı.
+- Web: `/app/overview` — `design/preview.html` bileşenlerle birebir yeniden üretimi (demo veri etiketli); durum sayfası faz haritası güncel (01-02 tamamlandı; "şu anki faz" sıradaki faza düşer).
+- Bileşen katmanında rastgele renk YOK: ui-web.css'te 56 düz hex → 28 anlamsal token'a bağlandı (250 `var(--tf-*)`).
+- Onarım (Faz 01 kalıntısı): `pnpm dev` API açılışı tsx/esbuild'in `emitDecoratorMetadata` üretmemesi nedeniyle düşüyordu → `tsc-watch` ile üretimle aynı derlemeden çalışır.
+- Kalite: 138 birim + 3 entegrasyon + 34 Storybook etkileşim + 13 E2E (Chromium) testi; 15 ekran görüntüsü `docs/screenshots/phase-02/`.
+- TEST-02 kapısı: PASS (`docs/reports/PHASE-02-REPORT.md`).
+
 ## 0.1.1 — Phase 01: Workspace and infrastructure foundation
 
 - Monorepo iskeleti kuruldu: pnpm 9 workspace + Turborepo; `apps/{api,web,mobile,worker}`, `packages/{contracts,api-client,ui-web,design-tokens,config,shared}`, `infra/`.

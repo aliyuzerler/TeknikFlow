@@ -154,20 +154,29 @@ export default async function HomePage() {
             </tr>
           </thead>
           <tbody>
-            {PHASES.map((phase) => (
-              <tr
-                key={phase.id}
-                className={phase.status === 'in-progress' ? 'is-current' : undefined}
-              >
-                <td>{String(phase.id).padStart(2, '0')}</td>
-                <td>{phase.name}</td>
-                <td>
-                  <span className={`phase-badge phase-badge--${phase.status}`}>
-                    {phaseStatusLabel(phase.status)}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {/*
+             * "Şu anki" faz: sürmekte olan faz; hiçbiri sürmüyorsa sıradaki
+             * başlanmamış faz — gösterge teslimat boyunca anlamlı kalır.
+             */}
+            {(() => {
+              const currentPhaseId =
+                PHASES.find((p) => p.status === 'in-progress')?.id ??
+                PHASES.find((p) => p.status === 'not-started')?.id;
+              return PHASES.map((phase) => (
+                <tr
+                  key={phase.id}
+                  className={phase.id === currentPhaseId ? 'is-current' : undefined}
+                >
+                  <td>{String(phase.id).padStart(2, '0')}</td>
+                  <td>{phase.name}</td>
+                  <td>
+                    <span className={`phase-badge phase-badge--${phase.status}`}>
+                      {phaseStatusLabel(phase.status)}
+                    </span>
+                  </td>
+                </tr>
+              ));
+            })()}
           </tbody>
         </table>
       </section>

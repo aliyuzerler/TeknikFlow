@@ -1,4 +1,5 @@
 :root {
+  /* Renkler — docs/DESIGN_SYSTEM.md ve design/preview.html ile birebir */
   --tf-ink-950: #132238;
   --tf-ink-900: #192b43;
   --tf-ink-800: #243b57;
@@ -6,11 +7,11 @@
   --tf-blue-600: #2563eb;
   --tf-blue-100: #dbeafe;
   --tf-teal-700: #0f766e;
-  --tf-teal-600: #0f9f9a;
+  --tf-teal-600: #0b9b96; /* 3:1 non-text — ilerleme dolumu (WCAG AA) */
   --tf-canvas: #f5f7fa;
   --tf-surface: #ffffff;
   --tf-text: #172033;
-  --tf-muted: #64748b;
+  --tf-muted: #627289; /* 4.5:1 canvas ve yüzey üzerinde (WCAG AA) */
   --tf-border: #e2e8f0;
   --tf-success: #15803d;
   --tf-success-bg: #dcfce7;
@@ -20,10 +21,76 @@
   --tf-danger-bg: #fee2e2;
   --tf-info: #0369a1;
   --tf-info-bg: #e0f2fe;
+
+  /* Anlamsal yardımcılar — bileşenlerde düz hex YASAK (tek kaynak burasıdır) */
+  --tf-placeholder: #68778c; /* girdi ipucu / pasif ikon — 4.5:1 metin, 3:1 ikon */
+  --tf-separator: #cbd5e1; /* hafif ayraç (ör. kırıntı yolu " /") */
+  --tf-subtle: #667485; /* yüzey üzerinde ikincil küçük not metni — 4.5:1 */
+
+  /* Marka geçişi — LogoMark gradyan uçları */
+  --tf-brand-blue: #3b82f6;
+  --tf-brand-teal: #14b8a6;
+
+  /* Bileşen yüzey/çizgi yardımcıları (önizlemedeki yinelenen tonlar) */
+  --tf-surface-alt: #fbfcfe; /* tablo başı/hover satırı, arama ve ikon düğmesi zemini */
+  --tf-bg-subtle: #f1f5f9; /* gri rozet/avatar, boş durum zemini */
+  --tf-bg-quiet: #f8fafc; /* panel dip notu zemini */
+  --tf-border-soft: #edf1f5; /* panel başlığı çizgisi, ilerleme yolu */
+  --tf-border-softer: #f0f3f6; /* tablo satırı ayırıcısı */
+  --tf-skeleton-base: #eef2f7;
+  --tf-skeleton-highlight: #f6f8fb;
+
+  /* Metin/ikon tonları */
+  --tf-text-strong: #334155; /* ikincil düğme metni ve tablo vurgusu */
+  --tf-header-muted: #697586; /* tablo başlık metni — 4.5:1 yüzey-alt üzerinde */
+  --tf-icon-muted: #52647a; /* pasif ikon düğmesi */
+  --tf-on-accent: #ffffff; /* vurgulu/koyu zemin üstü metin */
+
+  /* Durum derin tonları ve SLA noktaları */
+  --tf-warning-strong: #9f6005; /* amber rozet metni — 4.5:1 warning-bg üzerinde */
+  --tf-danger-strong: #991b1b; /* danger düğme hover zemini */
+  --tf-attention: #c2410c; /* turuncu dikkat metni */
+  --tf-dot-warning: #d78000; /* 3:1 non-text */
+  --tf-dot-danger: #ef4444;
+  --tf-dot-success: #00a971; /* 3:1 non-text */
+
+  /* Koyu kenar çubuğu paleti */
+  --tf-sidebar-text: #d8e2ef;
+  --tf-sidebar-item: #b7c6d6;
+  --tf-sidebar-label: #8395aa;
+  --tf-sidebar-subtle: #9eafc2;
+  --tf-sidebar-role: #9aacc0;
+  --tf-sidebar-active: #243e5d;
+  --tf-sidebar-count-bg: #344f70;
+  --tf-sidebar-count-text: #e9f4ff;
+  --tf-sidebar-divider: #2d4058;
+
+  /* Ton varyantları (avatar/metrik ikonu) */
+  --tf-violet-bg: #f5f3ff;
+  --tf-violet: #7c3aed;
+  --tf-pink-bg: #fce7f3;
+  --tf-pink: #be185d;
+
+  /* Tipografi ölçeği (DESIGN_SYSTEM.md hiyerarşisi) */
+  --tf-text-xs: 12px;
+  --tf-text-sm: 13px;
+  --tf-text-base: 14px;
+  --tf-text-md: 15px;
+  --tf-text-lg: 16px;
+  --tf-text-xl: 18px;
+  --tf-text-2xl: 24px;
+  --tf-text-3xl: 28px;
+
+  /* Yarıçaplar */
   --tf-radius-sm: 8px;
   --tf-radius-md: 12px;
   --tf-radius-lg: 16px;
+
+  /* Gölge ve odak */
   --tf-shadow-card: 0 1px 2px rgba(19, 34, 56, 0.04), 0 6px 18px rgba(19, 34, 56, 0.035);
+  --tf-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.32);
+
+  /* Boşluk ölçeği (8px taban) */
   --tf-space-1: 4px;
   --tf-space-2: 8px;
   --tf-space-3: 12px;
@@ -32,6 +99,9 @@
   --tf-space-6: 24px;
   --tf-space-8: 32px;
   --tf-space-10: 40px;
+
+  /* Yazı tipi — @fontsource-variable/inter aile adıyla birlikte */
   --tf-font:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
 }

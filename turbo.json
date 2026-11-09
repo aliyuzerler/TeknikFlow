@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "storybook-static/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
@@ -26,6 +26,15 @@
         "S3_ACCESS_KEY",
         "S3_SECRET_KEY"
       ]
+    },
+    "test:storybook": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["NODE_ENV"]
+    },
+    "storybook:build": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
     },
     "dev": {
       "cache": false,

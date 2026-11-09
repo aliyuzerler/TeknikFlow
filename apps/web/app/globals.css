@@ -1,5 +1,12 @@
 /* TeknikFlow — Faz 01 durum sayfası stilleri.
-   Tüm renk/boşluk/yarıçap değerleri @teknikflow/design-tokens token'larından gelir. */
+   Tüm renk/boşluk/yarıçap değerleri @teknikflow/design-tokens token'larından gelir.
+   (Kod bloğu tınıları paylaşılan sistemde karşılığı olmadığından uygulama düzeyinde
+   bir kez tanımlanır — kural gövdesinde düz hex kullanılmaz.) */
+
+:root {
+  --app-code-text: #dbe7f5;
+  --app-code-muted: #6c8bb0;
+}
 
 * {
   box-sizing: border-box;
@@ -189,7 +196,7 @@ h2 {
 /* ---- Komut bloğu ---- */
 .commands {
   background: var(--tf-ink-950);
-  color: #dbe7f5;
+  color: var(--app-code-text);
   border-radius: var(--tf-radius-md);
   padding: var(--tf-space-4) var(--tf-space-5);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -200,7 +207,7 @@ h2 {
 }
 
 .commands .cmt {
-  color: #6c8bb0;
+  color: var(--app-code-muted);
 }
 
 /* ---- Faz tablosu ---- */

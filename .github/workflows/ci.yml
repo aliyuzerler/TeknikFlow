@@ -120,6 +120,12 @@ jobs:
       - name: Entegrasyon testleri (health uçları — gerçek DB/Redis/RustFS)
         run: pnpm test:integration
 
+      - name: Storybook derlemesi (tüm hikâyeler)
+        run: pnpm --filter @teknikflow/ui-web storybook:build
+
+      - name: Storybook etkileşim testleri (vitest + play fonksiyonları)
+        run: pnpm --filter @teknikflow/ui-web test:storybook
+
       - name: Playwright tarayıcısını kur
         run: pnpm --filter @teknikflow/web exec playwright install --with-deps chromium
 

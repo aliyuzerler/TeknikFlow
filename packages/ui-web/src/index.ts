@@ -1,15 +1,83 @@
 /**
- * Faz 01 yer tutucusu. Somut bileşenler Faz 02'de (marka sistemi, UI shell ve
- * Storybook) tasarım token'larıyla birlikte eklenir; burada yalnızca paketin
- * varlığı ve plan kaydı tutulur.
+ * @teknikflow/ui-web — TeknikFlow web tasarım sistemi.
+ *
+ * Faz 02: marka (logo), kabuk (AppShell/Sidebar/Topbar), temel bileşenler
+ * (düğme, girdi, rozet, kart, tablo, onay kutusu, yan panel) ve durumlar
+ * (boş/hata/iskelet/çevrimdışı/senkron). Tümü docs/DESIGN_SYSTEM.md ve
+ * design/preview.html önizlemesine sadık; renk/boşluk değerleri token'lardan.
+ *
+ * Still: `import '@teknikflow/ui-web/styles.css'`
+ * (öncesinde '@teknikflow/design-tokens/tokens.css' yüklenmelidir).
  */
-export const UI_WEB_PHASE = 'phase-02' as const;
 
-export const PLANNED_COMPONENTS = [
-  'Button',
-  'StatusBadge',
-  'DataTable',
-  'Dialog',
-  'FormField',
-  'Toast',
-] as const;
+// Marka
+export { Logo, LogoMark } from './brand/logo.js';
+
+// Kabuk
+export {
+  AppShell,
+  type AppShellProps,
+  type NavItem,
+  type NavSection,
+  type ShellUser,
+} from './components/app-shell.js';
+
+// Sayfa yapıları
+export {
+  Breadcrumbs,
+  PageHeader,
+  type BreadcrumbItem,
+  type PageHeaderProps,
+} from './components/page.js';
+
+// Temel bileşenler
+export {
+  Button,
+  type ButtonProps,
+  type ButtonSize,
+  type ButtonVariant,
+} from './components/button.js';
+export {
+  FormField,
+  Input,
+  SearchInput,
+  type FormFieldProps,
+  type InputProps,
+  type SearchInputProps,
+} from './components/input.js';
+export { StatusBadge, type BadgeTone, type StatusBadgeProps } from './components/status-badge.js';
+export { Card, Panel, type CardProps, type PanelProps } from './components/card.js';
+export { MetricCard, type MetricCardProps, type MetricTone } from './components/metric-card.js';
+export { DataTable, type DataTableColumn, type DataTableProps } from './components/data-table.js';
+
+// Diyaloglar
+export { ConfirmDialog, type ConfirmDialogProps } from './components/confirm-dialog.js';
+export { SideDrawer, type SideDrawerProps } from './components/side-drawer.js';
+
+// Durumlar ve geri bildirim
+export {
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  type EmptyStateProps,
+  type ErrorStateProps,
+  type SkeletonProps,
+} from './components/states.js';
+export {
+  Avatar,
+  OfflineBanner,
+  ProgressBar,
+  SyncStatus,
+  type AvatarProps,
+  type AvatarTone,
+  type OfflineBannerProps,
+  type ProgressBarProps,
+  type SyncState,
+  type SyncStatusProps,
+} from './components/feedback.js';
+
+// İkonlar
+export { Icon, type IconName, type IconProps } from './icons.js';
+
+// Kanca
+export { useFocusTrap } from './hooks/use-focus-trap.js';

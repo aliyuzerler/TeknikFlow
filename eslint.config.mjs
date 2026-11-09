@@ -3,6 +3,7 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default tseslint.config(
   {
@@ -14,6 +15,7 @@ export default tseslint.config(
       '**/.turbo/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      '**/storybook-static/**',
       'infra/native/bin/**',
       'infra/native/.data/**',
       'infra/native/.state/**',
@@ -54,6 +56,13 @@ export default tseslint.config(
       ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'always', { null: 'ignore' }],
+    },
+  },
+  {
+    files: ['**/*.tsx'],
+    plugins: { 'jsx-a11y': jsxA11y },
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
     },
   },
   {

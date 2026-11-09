@@ -1,0 +1,1317 @@
+/*
+ * TeknikFlow Web Tasarım Sistemi — tek stil sayfası (tf- sınıf ailesi).
+ *
+ * Kaynaklar: design/tokens.css (renk/boşluk/yarıçap/gölge), design/preview.html
+ * (AppShell/panel/metrik/tablo görünümü), docs/DESIGN_SYSTEM.md.
+ * TÜM değerler CSS değişkenlerinden gelir — bu dosyada ham hex YOKTUR
+ * (yalnızca kenar çubuğu koyu yüzey varyantları rgba tonlamaları).
+ *
+ * Tüketim: `import '@teknikflow/ui-web/styles.css'` (öncesinde
+ * `@teknikflow/design-tokens/tokens.css` yüklenmiş olmalı).
+ */
+
+/* ---------- Taban ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.tf-root,
+.tf-root body {
+  margin: 0;
+}
+
+:where(.tf-root) {
+  background: var(--tf-canvas);
+  color: var(--tf-text);
+  font-family: var(--tf-font);
+  font-size: var(--tf-text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Klavye odakları her yerde görünür; fare tıklamalarında gösterilmez. */
+:focus-visible {
+  outline: 2px solid var(--tf-blue-600);
+  outline-offset: 2px;
+}
+
+.tf-skip-link {
+  position: absolute;
+  left: var(--tf-space-4);
+  top: -48px;
+  z-index: 100;
+  background: var(--tf-ink-950);
+  color: var(--tf-on-accent);
+  padding: var(--tf-space-2) var(--tf-space-4);
+  border-radius: var(--tf-radius-sm);
+  font-size: var(--tf-text-sm);
+  text-decoration: none;
+  transition: top 120ms ease;
+}
+
+.tf-skip-link:focus {
+  top: var(--tf-space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Düğme ---------- */
+.tf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tf-space-2);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  padding: 10px 14px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-text-strong);
+  background: var(--tf-surface);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tf-btn:hover:not(:disabled) {
+  border-color: var(--tf-separator);
+  background: var(--tf-surface-alt);
+}
+
+.tf-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tf-btn--primary {
+  background: var(--tf-blue-600);
+  border-color: var(--tf-blue-600);
+  color: var(--tf-on-accent);
+  box-shadow: 0 3px 7px rgba(37, 99, 235, 0.17);
+}
+
+.tf-btn--primary:hover:not(:disabled) {
+  background: var(--tf-blue-700);
+  border-color: var(--tf-blue-700);
+}
+
+.tf-btn--danger {
+  background: var(--tf-danger);
+  border-color: var(--tf-danger);
+  color: var(--tf-on-accent);
+}
+
+.tf-btn--danger:hover:not(:disabled) {
+  background: var(--tf-danger-strong);
+  border-color: var(--tf-danger-strong);
+}
+
+.tf-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--tf-muted);
+}
+
+.tf-btn--ghost:hover:not(:disabled) {
+  color: var(--tf-text);
+  background: rgba(100, 116, 139, 0.08);
+}
+
+.tf-btn--sm {
+  padding: 6px 10px;
+  font-size: var(--tf-text-xs);
+}
+
+.tf-btn--full {
+  width: 100%;
+}
+
+.tf-btn__spin {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid currentcolor;
+  border-top-color: transparent;
+  animation: tf-spin 700ms linear infinite;
+}
+
+@keyframes tf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Girdi / form ---------- */
+.tf-input {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  background: var(--tf-surface-alt);
+  padding: 0 var(--tf-space-3);
+  min-height: 40px;
+}
+
+.tf-input:focus-within {
+  border-color: var(--tf-blue-600);
+  box-shadow: var(--tf-focus-ring);
+}
+
+.tf-input__control {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  font-family: inherit;
+  font-size: var(--tf-text-base);
+  color: var(--tf-text);
+  min-width: 0;
+}
+
+.tf-input__control:focus {
+  outline: none;
+}
+
+.tf-input__control::placeholder {
+  color: var(--tf-placeholder);
+}
+
+.tf-input--invalid {
+  border-color: var(--tf-danger);
+}
+
+.tf-input--invalid:focus-within {
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.25);
+}
+
+.tf-input__clear {
+  border: 0;
+  background: transparent;
+  color: var(--tf-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: var(--tf-space-1);
+  border-radius: 6px;
+}
+
+.tf-input__clear:hover {
+  color: var(--tf-text);
+  background: rgba(100, 116, 139, 0.1);
+}
+
+.tf-field {
+  display: grid;
+  gap: 6px;
+}
+
+.tf-field__label {
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+}
+
+.tf-field__label .tf-field__req {
+  color: var(--tf-danger);
+  margin-left: 2px;
+}
+
+.tf-field__hint {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+}
+
+.tf-field__error {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-danger);
+  font-weight: 500;
+}
+
+.tf-input--disabled {
+  background: var(--tf-canvas);
+  color: var(--tf-muted);
+}
+
+/* ---------- Rozet ---------- */
+.tf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 20px;
+  padding: 5px 9px;
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tf-badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+  flex-shrink: 0;
+}
+
+.tf-badge--blue {
+  color: var(--tf-blue-700);
+  background: var(--tf-blue-100);
+}
+
+.tf-badge--green {
+  color: var(--tf-success);
+  background: var(--tf-success-bg);
+}
+
+.tf-badge--amber {
+  color: var(--tf-warning-strong);
+  background: var(--tf-warning-bg);
+}
+
+.tf-badge--red {
+  color: var(--tf-danger);
+  background: var(--tf-danger-bg);
+}
+
+.tf-badge--info {
+  color: var(--tf-info);
+  background: var(--tf-info-bg);
+}
+
+.tf-badge--gray {
+  color: var(--tf-muted);
+  background: var(--tf-bg-subtle);
+}
+
+.tf-badge__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* ---------- Kart / panel ---------- */
+.tf-card {
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  box-shadow: var(--tf-shadow-card);
+}
+
+.tf-panel {
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  box-shadow: var(--tf-shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tf-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--tf-space-3);
+  padding: 17px 19px;
+  border-bottom: 1px solid var(--tf-border-soft);
+}
+
+.tf-panel__title {
+  font-size: var(--tf-text-lg);
+  margin: 0;
+  font-weight: 700;
+}
+
+.tf-panel__subtitle {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+  margin: 4px 0 0;
+}
+
+.tf-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-3);
+}
+
+.tf-panel__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tf-panel__footer {
+  padding: var(--tf-space-3) 19px;
+  background: var(--tf-bg-quiet);
+  border-top: 1px solid var(--tf-border-soft);
+  color: var(--tf-subtle);
+  font-size: var(--tf-text-xs);
+}
+
+.tf-link {
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  color: var(--tf-blue-600);
+  text-decoration: none;
+}
+
+.tf-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Metrik kartı ---------- */
+.tf-metric {
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  padding: 17px 18px;
+  box-shadow: var(--tf-shadow-card);
+}
+
+.tf-metric__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--tf-muted);
+  font-size: var(--tf-text-xs);
+}
+
+.tf-metric__icon {
+  height: 32px;
+  width: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--tf-blue-100);
+  color: var(--tf-blue-600);
+}
+
+.tf-metric__icon--green {
+  background: var(--tf-success-bg);
+  color: var(--tf-success);
+}
+
+.tf-metric__icon--amber {
+  background: var(--tf-warning-bg);
+  color: var(--tf-attention);
+}
+
+.tf-metric__icon--violet {
+  background: var(--tf-violet-bg);
+  color: var(--tf-violet);
+}
+
+.tf-metric__value {
+  display: block;
+  font-size: var(--tf-text-3xl);
+  letter-spacing: -0.8px;
+  margin: 12px 0 5px;
+  font-weight: 700;
+}
+
+.tf-metric__suffix {
+  font-size: var(--tf-text-lg);
+  color: var(--tf-placeholder);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.tf-metric__delta {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-success);
+}
+
+.tf-metric__delta--down {
+  color: var(--tf-danger);
+}
+
+.tf-metric__delta--flat {
+  color: var(--tf-muted);
+}
+
+.tf-metric__delta-note {
+  color: var(--tf-muted);
+  margin-left: 4px;
+}
+
+.tf-metric__note {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-warning);
+}
+
+/* ---------- Veri tablosu ---------- */
+.tf-table-wrap {
+  overflow: auto;
+}
+
+.tf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tf-table th {
+  text-align: left;
+  background: var(--tf-surface-alt);
+  color: var(--tf-header-muted);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--tf-border-soft);
+  white-space: nowrap;
+}
+
+.tf-table td {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--tf-border-softer);
+  font-size: var(--tf-text-sm);
+  vertical-align: top;
+}
+
+.tf-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tf-table tbody tr:hover td {
+  background: var(--tf-surface-alt);
+}
+
+.tf-table__wo {
+  font-weight: 700;
+  color: var(--tf-text-strong);
+}
+
+.tf-table__customer {
+  font-weight: 600;
+}
+
+.tf-table__sub {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-subtle);
+  margin-top: 3px;
+}
+
+/* ---------- Boş / hata / iskelet ---------- */
+.tf-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--tf-space-2);
+  padding: var(--tf-space-10) var(--tf-space-6);
+  text-align: center;
+}
+
+.tf-empty__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--tf-bg-subtle);
+  color: var(--tf-muted);
+}
+
+.tf-empty__title {
+  margin: 0;
+  font-size: var(--tf-text-lg);
+  font-weight: 600;
+  color: var(--tf-text);
+}
+
+.tf-empty__desc {
+  margin: 0;
+  max-width: 380px;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-muted);
+}
+
+.tf-error {
+  display: grid;
+  justify-items: center;
+  gap: var(--tf-space-2);
+  padding: var(--tf-space-10) var(--tf-space-6);
+  text-align: center;
+}
+
+.tf-error__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--tf-danger-bg);
+  color: var(--tf-danger);
+}
+
+.tf-error__title {
+  margin: 0;
+  font-size: var(--tf-text-lg);
+  font-weight: 600;
+  color: var(--tf-text);
+}
+
+.tf-error__desc {
+  margin: 0;
+  max-width: 420px;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-muted);
+}
+
+.tf-skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--tf-skeleton-base) 25%,
+    var(--tf-skeleton-highlight) 45%,
+    var(--tf-skeleton-base) 65%
+  );
+  background-size: 200% 100%;
+  animation: tf-shimmer 1300ms ease-in-out infinite;
+  border-radius: var(--tf-radius-sm);
+}
+
+@keyframes tf-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Onay kutusu (dialog) ---------- */
+.tf-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 34, 56, 0.55);
+  display: grid;
+  place-items: center;
+  padding: var(--tf-space-4);
+  z-index: 60;
+}
+
+.tf-dialog {
+  width: 100%;
+  max-width: 440px;
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(19, 34, 56, 0.22);
+  padding: var(--tf-space-6);
+  display: grid;
+  gap: var(--tf-space-4);
+}
+
+.tf-dialog__title {
+  margin: 0;
+  font-size: var(--tf-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.tf-dialog__desc {
+  margin: 0;
+  color: var(--tf-muted);
+  font-size: var(--tf-text-base);
+}
+
+.tf-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tf-space-2);
+  margin-top: var(--tf-space-1);
+}
+
+.tf-dialog__icon-danger {
+  color: var(--tf-danger);
+}
+
+/* ---------- Yan panel (drawer) ---------- */
+.tf-drawer__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 34, 56, 0.45);
+  z-index: 55;
+}
+
+.tf-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: min(320px, 88vw);
+  background: var(--tf-surface);
+  border-left: 1px solid var(--tf-border);
+  box-shadow: -14px 0 40px rgba(19, 34, 56, 0.16);
+  z-index: 56;
+  display: flex;
+  flex-direction: column;
+  animation: tf-drawer-in 180ms ease-out;
+}
+
+.tf-drawer--left {
+  right: auto;
+  left: 0;
+  border-left: 0;
+  border-right: 1px solid var(--tf-border);
+  box-shadow: 14px 0 40px rgba(19, 34, 56, 0.16);
+}
+
+@keyframes tf-drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.tf-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tf-space-3);
+  padding: var(--tf-space-4) var(--tf-space-4);
+  border-bottom: 1px solid var(--tf-border);
+}
+
+.tf-drawer__title {
+  margin: 0;
+  font-size: var(--tf-text-lg);
+  font-weight: 700;
+}
+
+.tf-drawer__close {
+  border: 1px solid var(--tf-border);
+  background: var(--tf-surface);
+  border-radius: var(--tf-radius-sm);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--tf-muted);
+}
+
+.tf-drawer__close:hover {
+  color: var(--tf-text);
+  background: var(--tf-surface-alt);
+}
+
+.tf-drawer__body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--tf-space-4);
+}
+
+/* ---------- Uygulama kabuğu ---------- */
+.tf-shell {
+  min-height: 100vh;
+  display: flex;
+  background: var(--tf-canvas);
+}
+
+.tf-sidebar {
+  width: 248px;
+  background: var(--tf-ink-950);
+  color: var(--tf-sidebar-text);
+  padding: 22px 14px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.tf-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 10px 26px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tf-sidebar__brand-text strong {
+  color: var(--tf-on-accent);
+  font-size: var(--tf-text-xl);
+  letter-spacing: -0.5px;
+  display: block;
+}
+
+.tf-sidebar__brand-text small {
+  display: block;
+  color: var(--tf-sidebar-subtle);
+  font-size: 10px;
+  margin-top: 2px;
+  letter-spacing: 0.4px;
+}
+
+.tf-navlabel {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--tf-sidebar-label);
+  padding: 12px 12px 7px;
+  text-transform: uppercase;
+}
+
+.tf-nav {
+  display: block;
+  padding: 0;
+  margin: 0;
+}
+
+.tf-nav__item {
+  height: 40px;
+  border-radius: var(--tf-radius-sm);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--tf-sidebar-item);
+  text-decoration: none;
+  font-size: var(--tf-text-sm);
+  margin: 2px 0;
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tf-nav__item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tf-on-accent);
+}
+
+.tf-nav__item--active {
+  background: var(--tf-sidebar-active);
+  color: var(--tf-on-accent);
+  font-weight: 600;
+}
+
+.tf-nav__item[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+.tf-nav__item--active:focus-visible {
+  outline-offset: -2px;
+}
+
+.tf-nav__icon {
+  width: 18px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.tf-nav__count {
+  margin-left: auto;
+  border-radius: 20px;
+  background: var(--tf-sidebar-count-bg);
+  color: var(--tf-sidebar-count-text);
+  font-size: 10px;
+  padding: 2px 7px;
+}
+
+.tf-sidebar__bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--tf-sidebar-divider);
+  padding: 16px 8px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.tf-sidebar__user b {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-on-accent);
+  display: block;
+}
+
+.tf-sidebar__user small {
+  display: block;
+  color: var(--tf-sidebar-role);
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.tf-shell__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tf-topbar {
+  height: 64px;
+  background: var(--tf-surface);
+  border-bottom: 1px solid var(--tf-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tf-space-4);
+  padding: 0 30px;
+}
+
+.tf-topbar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-3);
+  min-width: 0;
+}
+
+.tf-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.tf-topbar__search {
+  width: 220px;
+}
+
+.tf-topbar__iconbtn {
+  height: 34px;
+  width: 34px;
+  border: 1px solid var(--tf-border);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--tf-icon-muted);
+  background: var(--tf-surface);
+  cursor: pointer;
+}
+
+.tf-topbar__iconbtn:hover {
+  color: var(--tf-text);
+  background: var(--tf-surface-alt);
+}
+
+.tf-menubtn {
+  display: none;
+  border: 1px solid var(--tf-border);
+  background: var(--tf-surface);
+  border-radius: var(--tf-radius-sm);
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  cursor: pointer;
+  color: var(--tf-text);
+}
+
+.tf-shell__content {
+  padding: 26px 30px 36px;
+  max-width: 1600px;
+  margin: auto;
+  width: 100%;
+  flex: 1;
+}
+
+/*
+ * Atlama bağlantısının hedefi (tabindex="-1"): klavye sekme sırasında
+ * olmadığından odak halkası gizlenir — odak yalnızca "İçeriğe geç"
+ * ile programatik olarak taşınır.
+ */
+.tf-shell__content:focus {
+  outline: none;
+}
+
+/* Sayfa başlığı */
+.tf-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--tf-space-4);
+  margin-bottom: 22px;
+}
+
+.tf-page-header__eyebrow {
+  font-size: 11px;
+  color: var(--tf-muted);
+  margin-bottom: 7px;
+  letter-spacing: 0.5px;
+}
+
+.tf-page-header__title {
+  font-size: 25px;
+  letter-spacing: -0.7px;
+  margin: 0 0 5px;
+  font-weight: 700;
+}
+
+.tf-page-header__subtitle {
+  color: var(--tf-muted);
+  font-size: var(--tf-text-sm);
+}
+
+.tf-page-header__actions {
+  display: flex;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+/* Breadcrumb */
+.tf-breadcrumbs {
+  color: var(--tf-muted);
+  font-size: var(--tf-text-xs);
+}
+
+.tf-breadcrumbs ol {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.tf-breadcrumbs li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tf-breadcrumbs a {
+  color: var(--tf-muted);
+  text-decoration: none;
+}
+
+.tf-breadcrumbs a:hover {
+  color: var(--tf-text);
+  text-decoration: underline;
+}
+
+.tf-breadcrumbs [aria-current='page'] {
+  color: var(--tf-text);
+  font-weight: 600;
+}
+
+/* ---------- Avatar / ilerleme ---------- */
+.tf-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--tf-blue-100);
+  color: var(--tf-blue-700);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: var(--tf-text-xs);
+  flex-shrink: 0;
+}
+
+.tf-avatar--sm {
+  width: 29px;
+  height: 29px;
+  font-size: 10px;
+}
+
+.tf-avatar--green {
+  background: var(--tf-success-bg);
+  color: var(--tf-success);
+}
+
+.tf-avatar--pink {
+  background: var(--tf-pink-bg);
+  color: var(--tf-pink);
+}
+
+.tf-avatar--gray {
+  background: var(--tf-bg-subtle);
+  color: var(--tf-muted);
+}
+
+.tf-progress {
+  width: 62px;
+  height: 5px;
+  background: var(--tf-border-soft);
+  border-radius: 9px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tf-progress__bar {
+  display: block;
+  height: 100%;
+  background: var(--tf-teal-600);
+  border-radius: 9px;
+  transition: width 200ms ease;
+}
+
+/* ---------- Geri bildirim (çevrimdışı / senkron) ---------- */
+.tf-offline-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-3);
+  border: 1px solid var(--tf-warning-bg);
+  background: var(--tf-warning-bg);
+  color: var(--tf-warning);
+  border-radius: var(--tf-radius-sm);
+  padding: var(--tf-space-3) var(--tf-space-4);
+  font-size: var(--tf-text-sm);
+  font-weight: 500;
+  margin-bottom: var(--tf-space-4);
+}
+
+.tf-offline-banner--error {
+  border-color: var(--tf-danger-bg);
+  background: var(--tf-danger-bg);
+  color: var(--tf-danger);
+}
+
+.tf-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 20px;
+  border: 1px solid var(--tf-border);
+  background: var(--tf-surface);
+  color: var(--tf-muted);
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  padding: 5px 10px;
+}
+
+.tf-sync__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tf-success);
+  flex-shrink: 0;
+}
+
+.tf-sync--syncing .tf-sync__dot {
+  background: var(--tf-warning);
+  animation: tf-pulse 1s ease-in-out infinite;
+}
+
+.tf-sync--pending .tf-sync__dot {
+  background: var(--tf-warning);
+}
+
+.tf-sync--error .tf-sync__dot {
+  background: var(--tf-danger);
+}
+
+@keyframes tf-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Yardımcı yerleşimler ---------- */
+.tf-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tf-section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.9fr);
+  gap: 16px;
+  margin-top: 17px;
+}
+
+.tf-stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.tf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* SLA listesi ( önizlemedeki sağ sütun ) */
+.tf-sla-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--tf-border-softer);
+}
+
+.tf-sla-item:last-child {
+  border-bottom: 0;
+}
+
+.tf-sla-time {
+  width: 42px;
+  color: var(--tf-muted);
+  font-size: var(--tf-text-xs);
+  flex-shrink: 0;
+}
+
+.tf-sla-info strong {
+  font-size: var(--tf-text-xs);
+  display: block;
+}
+
+.tf-sla-info small {
+  font-size: 10px;
+  color: var(--tf-subtle);
+}
+
+.tf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tf-dot-warning);
+  flex-shrink: 0;
+}
+
+.tf-dot--red {
+  background: var(--tf-dot-danger);
+}
+
+.tf-dot--green {
+  background: var(--tf-dot-success);
+}
+
+/* ---------- Duyarlı yerleşim (önizleme kırılımları) ---------- */
+@media (max-width: 1100px) {
+  .tf-sidebar {
+    width: 210px;
+  }
+
+  .tf-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tf-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tf-stack--two {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .tf-sidebar {
+    display: none;
+  }
+
+  .tf-menubtn {
+    display: grid;
+  }
+
+  .tf-topbar {
+    padding: 0 var(--tf-space-4);
+    height: 56px;
+  }
+
+  .tf-topbar__search {
+    display: none;
+  }
+
+  .tf-shell__content {
+    padding: 20px 14px 28px;
+  }
+
+  .tf-page-header {
+    align-items: flex-start;
+    gap: 14px;
+    flex-direction: column;
+  }
+
+  .tf-page-header__title {
+    font-size: 22px;
+  }
+
+  .tf-page-header__actions {
+    width: 100%;
+  }
+
+  .tf-page-header__actions .tf-btn {
+    flex: 1;
+  }
+
+  .tf-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .tf-metric {
+    padding: 13px;
+  }
+
+  .tf-metric__value {
+    font-size: var(--tf-text-2xl);
+  }
+
+  .tf-section-grid {
+    display: block;
+  }
+
+  .tf-stack--two {
+    grid-template-columns: 1fr;
+  }
+
+  .tf-stack {
+    margin-top: 14px;
+  }
+
+  .tf-table th,
+  .tf-table td {
+    padding: 12px;
+  }
+
+  .tf-breadcrumbs {
+    font-size: 11px;
+  }
+
+  .tf-topbar__right {
+    gap: 9px;
+  }
+}
+
+/* ---------- Marka (logo) ---------- */
+.tf-logo__text strong {
+  display: block;
+  font-size: var(--tf-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+}
+
+.tf-logo__text small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  color: var(--tf-sidebar-subtle);
+  margin-top: 2px;
+}
+
+.tf-logo--light .tf-logo__text strong {
+  color: var(--tf-on-accent);
+}

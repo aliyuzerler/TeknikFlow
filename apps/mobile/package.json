@@ -10,6 +10,7 @@
     "test": "echo 'Mobil test paketi Faz 07 ile kurulur (Jest + RNTL + Maestro)' && exit 0"
   },
   "dependencies": {
+    "@teknikflow/design-tokens": "workspace:^",
     "expo": "^58.0.23",
     "expo-status-bar": "^58.0.4",
     "react": "19.3.1",
