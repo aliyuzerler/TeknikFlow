@@ -84,5 +84,13 @@ export { Icon, type IconName, type IconProps } from './icons.js';
 export { Pager, type PagerProps } from './components/pager.js';
 export { DetailList, type DetailItem, type DetailListProps } from './components/detail-list.js';
 
+// Faz 05: olay akışı / zaman çizelgesi
+export {
+  Timeline,
+  type TimelineItem,
+  type TimelineProps,
+  type TimelineTone,
+} from './components/timeline.js';
+
 // Kanca
 export { useFocusTrap } from './hooks/use-focus-trap.js';

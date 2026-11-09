@@ -45,6 +45,15 @@ model User {
   refreshTokens RefreshTokenFamily[]
   invitesSent Invitation[] @relation("InvitationInviter")
 
+  // Faz 05 — servis akışı ilişkileri (aktör rolleri)
+  createdRequests  ServiceRequest[] @relation("RequestCreator")
+  workOrdersCreated WorkOrder[] @relation("WorkOrderCreator")
+  assignedWorkOrders WorkOrder[] @relation("WorkOrderAssignee")
+  workOrderAssignments WorkOrderAssignment[] @relation("WorkOrderAssignmentUser")
+  assignmentsMade WorkOrderAssignment[] @relation("WorkOrderAssignmentBy")
+  workOrderEvents  WorkOrderEvent[] @relation("WorkOrderEventActor")
+  workOrderNotes   WorkOrderNote[] @relation("WorkOrderNoteAuthor")
+
   @@map("users")
 }
 
@@ -81,6 +90,16 @@ model Tenant {
   subscription Subscription?
   roles        Role[]
 
+  // Faz 05 — servis akışı
+  serviceCategories ServiceCategory[]
+  slaPolicies       SlaPolicy[]
+  serviceRequests   ServiceRequest[]
+  workOrders        WorkOrder[]
+  workOrderAssignments WorkOrderAssignment[]
+  workOrderEvents   WorkOrderEvent[]
+  workOrderNotes    WorkOrderNote[]
+  workOrderCounters WorkOrderCounter[]
+
   @@map("tenants")
 }
 
@@ -102,6 +121,8 @@ model Branch {
   timezone  String   @default("Europe/Istanbul")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  workOrders WorkOrder[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -366,6 +387,10 @@ model Customer {
   assets          Asset[]
   crmEvents       CrmEvent[]
 
+  // Faz 05
+  serviceRequests ServiceRequest[]
+  workOrders      WorkOrder[]
+
   @@unique([tenantId, nameNormalized])
   @@index([tenantId, status, createdAt])
   @@map("customers")
@@ -425,6 +450,10 @@ model ServiceLocation {
 
   assets      Asset[]
 
+  // Faz 05
+  serviceRequests ServiceRequest[]
+  workOrders  WorkOrder[]
+
   @@index([tenantId, customerId])
   @@map("service_locations")
 }
@@ -457,6 +486,10 @@ model Asset {
 
   documents AssetDocument[]
   crmEvents CrmEvent[]
+
+  // Faz 05
+  serviceRequests ServiceRequest[]
+  workOrders      WorkOrder[]
 
   @@unique([tenantId, assetTag])
   @@index([tenantId, customerId, createdAt])
@@ -519,4 +552,275 @@ model CrmEvent {
   @@index([tenantId, customerId, occurredAt])
   @@index([tenantId, assetId, occurredAt])
   @@map("crm_events")
+}
+
+// ---------------------------------------------------------------------------
+// Faz 05 — servis talebi (intake) ve iş emri yaşam döngüsü
+// (docs/DATA_MODEL.md §Requests; tümü tenant-owned ve RLS FORCE ile korunur)
+// ----------------------------------------------------------------------------
+
+/// Servis kategorisi — talep sınıflandırması (kiracı bazlı katalog).
+model ServiceCategory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  key         String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  serviceRequests ServiceRequest[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("service_categories")
+}
+
+/// Öncelik bazlı SLA çözüm süresi (dakika). slaDueAt bu değerden üretilir.
+model SlaPolicy {
+  id            String          @id @default(uuid())
+  tenantId      String
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  priority      ServicePriority
+  resolveMinutes Int
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([tenantId, priority])
+  @@map("sla_policies")
+}
+
+enum ServicePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  @@map("service_priority")
+}
+
+/// Servis talebi — intake gelen kutusunun kaydı. Talep iş emrine DÖNÜŞTÜRÜLÜR
+/// (birebir: WorkOrder.requestId tekil). Durum: NEW → IN_REVIEW → CONVERTED;
+/// CANCELLED herhangi bir açık durumdan neden koduyla.
+model ServiceRequest {
+  id               String           @id @default(uuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  customerId       String
+  customer         Customer         @relation(fields: [customerId], references: [id])
+  assetId          String?
+  asset            Asset?           @relation(fields: [assetId], references: [id])
+  serviceLocationId String?
+  serviceLocation  ServiceLocation? @relation(fields: [serviceLocationId], references: [id])
+  categoryId       String?
+  category         ServiceCategory? @relation(fields: [categoryId], references: [id])
+  source           RequestSource    @default(OFFICE)
+  subject          String
+  description      String?
+  priority         ServicePriority  @default(MEDIUM)
+  status           RequestStatus    @default(NEW)
+  /// Öncelik SLA'ından hesaplanır; öncelik değişince yeniden hesaplanır.
+  slaDueAt         DateTime?
+  cancellationReason CancellationReason?
+  cancellationNote    String?
+  createdById      String?
+  createdBy        User?            @relation("RequestCreator", fields: [createdById], references: [id])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  convertedWorkOrder WorkOrder?
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, priority, createdAt])
+  @@index([tenantId, customerId, createdAt])
+  @@map("service_requests")
+}
+
+enum RequestSource {
+  PORTAL
+  OFFICE
+  EMAIL
+  API
+  @@map("request_source")
+}
+
+enum RequestStatus {
+  NEW
+  IN_REVIEW
+  CONVERTED
+  CANCELLED
+  @@map("request_status")
+}
+
+/// İş emri — yaşam döngüsü durum makinesiyle (work-order-state.ts) işletilir.
+/// workOrderNo: WO-YYYY-NNNN — kiracı+yıl sayaç tablosundan atomik üretilir,
+/// (tenantId, workOrderNo) tekil indeks geri savunmadır.
+/// version: iyimser eşzamanlılık (expectedVersion uyuşmazsa 409).
+model WorkOrder {
+  id                String           @id @default(uuid())
+  tenantId          String
+  tenant            Tenant           @relation(fields: [tenantId], references: [id])
+  workOrderNo       String
+  requestId         String?          @unique
+  request           ServiceRequest?  @relation(fields: [requestId], references: [id])
+  customerId        String
+  customer          Customer         @relation(fields: [customerId], references: [id])
+  assetId           String?
+  asset             Asset?           @relation(fields: [assetId], references: [id])
+  serviceLocationId String?
+  serviceLocation   ServiceLocation? @relation(fields: [serviceLocationId], references: [id])
+  branchId          String?
+  branch            Branch?          @relation(fields: [branchId], references: [id])
+  type              WorkOrderType    @default(CORRECTIVE)
+  priority          ServicePriority  @default(MEDIUM)
+  status            WorkOrderStatus  @default(DRAFT)
+  subject           String
+  description       String?
+  scheduledStart    DateTime?
+  scheduledEnd      DateTime?
+  /// Güncel atanan teknisyen (WorkOrderAssignment geçmişi tamamlayıcı).
+  assignedToId      String?
+  assignedTo        User?            @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  acceptedAt        DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  closedAt          DateTime?
+  cancelledAt       DateTime?
+  cancellationReason CancellationReason?
+  cancellationNote    String?
+  version           Int              @default(0)
+  createdById       String?
+  createdBy         User?            @relation("WorkOrderCreator", fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  assignments WorkOrderAssignment[]
+  events      WorkOrderEvent[]
+  notes       WorkOrderNote[]
+
+  @@unique([tenantId, workOrderNo])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, assignedToId, scheduledStart])
+  @@index([tenantId, customerId, createdAt])
+  @@map("work_orders")
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  PLANNED
+  ASSIGNED
+  ACCEPTED
+  EN_ROUTE
+  ON_SITE
+  IN_PROGRESS
+  WAITING_PARTS
+  WAITING_CUSTOMER
+  COMPLETED
+  CLOSED
+  CANCELLED
+  @@map("work_order_status")
+}
+
+enum WorkOrderType {
+  CORRECTIVE
+  PREVENTIVE
+  INSTALLATION
+  INSPECTION
+  OTHER
+  @@map("work_order_type")
+}
+
+enum CancellationReason {
+  CUSTOMER_REQUEST
+  DUPLICATE
+  OUT_OF_SCOPE
+  PARTS_UNAVAILABLE
+  SCHEDULE_CONFLICT
+  OTHER
+  @@map("cancellation_reason")
+}
+
+/// Atama geçmişi — ekle-güncelle değil: yeni atama eski ACTIVE kaydı REMOVED
+/// yapar (denetlenebilir geçmiş). Çift gönderim: aynı kullanıcıya ikinci atama
+/// idempotent kabul edilir (yeni kayıt üretilmez).
+model WorkOrderAssignment {
+  id            String           @id @default(uuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  workOrderId   String
+  workOrder     WorkOrder        @relation(fields: [workOrderId], references: [id])
+  userId        String
+  user          User             @relation("WorkOrderAssignmentUser", fields: [userId], references: [id])
+  assignedById  String?
+  assignedBy    User?            @relation("WorkOrderAssignmentBy", fields: [assignedById], references: [id])
+  status        AssignmentStatus @default(ACTIVE)
+  assignedAt    DateTime         @default(now())
+  removedAt     DateTime?
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, userId, status])
+  @@map("work_order_assignments")
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  REMOVED
+  @@map("assignment_status")
+}
+
+/// İş emri olay akışı — append-only zaman çizelgesi. fromState/toState durum
+/// makinesi geçişlerinde; atama/iptal/not olaylarında ayrıca kaydedilir.
+/// metadataJson GÜVENLİ alanlar taşır (neden kodu, not kimliği; asla gövde).
+model WorkOrderEvent {
+  id           String           @id @default(uuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  workOrderId  String
+  workOrder    WorkOrder        @relation(fields: [workOrderId], references: [id])
+  eventType    String
+  fromState    WorkOrderStatus?
+  toState      WorkOrderStatus?
+  actorId      String?
+  actor        User?            @relation("WorkOrderEventActor", fields: [actorId], references: [id])
+  metadataJson Json            @default("{}")
+  occurredAt   DateTime         @default(now())
+
+  @@index([tenantId, workOrderId, occurredAt])
+  @@map("work_order_events")
+}
+
+/// İş emri notu — dahili veya müşteri-görünür. CUSTOMER görünürliği
+/// portale (Faz 12) açılır; personel her ikisini de görür ve etiketlenir.
+model WorkOrderNote {
+  id          String         @id @default(uuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  workOrderId String
+  workOrder   WorkOrder      @relation(fields: [workOrderId], references: [id])
+  authorId    String?
+  author      User?          @relation("WorkOrderNoteAuthor", fields: [authorId], references: [id])
+  body        String
+  visibility  NoteVisibility @default(INTERNAL)
+  createdAt   DateTime       @default(now())
+
+  @@index([tenantId, workOrderId, createdAt])
+  @@map("work_order_notes")
+}
+
+enum NoteVisibility {
+  INTERNAL
+  CUSTOMER
+  @@map("note_visibility")
+}
+
+/// İş emri numara sayacı — (kiracı, yıl) başına atomik artış.
+/// Uygulama rolü RLS'ye tabidir; sayaç kiracı kapsamında artar.
+model WorkOrderCounter {
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  year        Int
+  lastNumber  Int     @default(0)
+
+  @@id([tenantId, year])
+  @@map("work_order_counters")
 }

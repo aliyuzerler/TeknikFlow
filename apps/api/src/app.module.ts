@@ -10,6 +10,7 @@ import { AuditModule } from './audit/audit.module.js';
 import { EntitlementsModule } from './entitlements/entitlements.module.js';
 import { PlatformModule } from './platform/platform.module.js';
 import { CrmModule } from './crm/crm.module.js';
+import { ServiceModule } from './service/service.module.js';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CrmModule } from './crm/crm.module.js';
     TenantsModule,
     PlatformModule,
     CrmModule,
+    ServiceModule,
     HealthModule,
   ],
 })

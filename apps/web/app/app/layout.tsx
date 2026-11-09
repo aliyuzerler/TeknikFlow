@@ -24,12 +24,37 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const canManageBranches = permissions.includes('branches:manage');
   const canViewCrm =
     permissions.includes('customers:view_all') || permissions.includes('customers:view_limited');
+  const canViewRequests =
+    permissions.includes('service_requests:create') || permissions.includes('work_orders:view_all');
+  const canViewWorkOrders =
+    permissions.includes('work_orders:view_all') ||
+    permissions.includes('work_orders:view_assigned');
 
   const navSections: NavSection[] = [
     {
       label: 'Çalışma alanı',
       items: [
         { id: 'overview', label: 'Genel Bakış', icon: 'overview' as const, href: '/app/overview' },
+        ...(canViewRequests
+          ? [
+              {
+                id: 'requests',
+                label: 'Servis Talepleri',
+                icon: 'inbox' as const,
+                href: '/app/requests',
+              },
+            ]
+          : []),
+        ...(canViewWorkOrders
+          ? [
+              {
+                id: 'work-orders',
+                label: 'İş Emirleri',
+                icon: 'work-orders' as const,
+                href: '/app/work-orders',
+              },
+            ]
+          : []),
         ...(canViewCrm
           ? [
               {

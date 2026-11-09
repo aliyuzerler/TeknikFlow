@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0 — Phase 05: Service intake and work-order lifecycle
+
+- Servis talebi (intake) gelen kutusu: oluşturma (portal/ofis/e-posta/API kaynakları), arama/durum/öncelik filtreleri + sayfalama, SLA hedefi ve görünür aşım bayrağı; kategori kataloğu (kiracıya özel, çift anahtar 409) ve öncelik bazlı SLA politikaları (varsayılan katalog: Acil 4sa → Düşük 72sa; triyajda öncelik değişimi SLA'yı createdAt referansıyla yeniden hesaplar).
+- Triyaj: öncelik/kategori/durum (NEW→IN_REVIEW) güncelleme; açıklama/eşya bağlama; terminal talepler değiştirilemez (409).
+- Talep → iş emri dönüşümü: birebir (`requestId` tekil); schedule girilirse PLANLANMIŞ, yoksa TASLAK iş emri; ikinci dönüşüm 409 REQUEST_NOT_CONVERTIBLE; talep etkinlik geçmişi `crm_events` JSON-yol filtresiyle.
+- İş emri durum makinesi (ADR-0007): 12 durum (taslak→planlandı→atandı→kabul→yolda→yerinde→devam→parça/müşteri bekleme→tamamlandı→kapatıldı + iptal), 24 izinli geçiş TEK gerçeklik tablosunda; birleşik geçiş ucu (409 INVALID_TRANSITION + izinli hedefler); yeniden açma ve geri alma dahil.
+- Geçiş yetkisi 5 sınıf: planlama (create|dispatch), atama (dispatch), yürütme (complete VE atanan-veya-view_all — teknisyen yalnız KENDİ işini yürütür), kapatma (yönetici), iptal (neden kodu zorunlu: müşteri talebi/mükerrer/kapsam dışı/parça/plan çakışması/diğer + not).
+- İş emri numaralandırma: WO-YYYY-NNNN — (kiracı, yıl) sayaç tablosunda atomik UPSERT-artış; (tenantId, workOrderNo) tekil indeks geri savunma; eşzamanlı oluşturmalar testte tekil.
+- Atamalar: append-only geçmiş (ACTIVE/REMOVED); yeniden atama eski kaydı kaldırır; aynı teknisyene çift gönderim idempotent; atanabilir roller `complete|view_assigned` (finans/planlayıcı atanamaz); şube kapsamı atamada doğrulanır (BRANCH_SCOPE_MISMATCH).
+- İyimser eşzamanlılık: `version` — düzenlemede zorunlu, geçişte opsiyonel → 409 VERSION_CONFLICT (çift gönderim/bayat sürüm koruması).
+- Notlar: dahili/müşteri-görünür ayrımı (portalde Faz 12'de açılır); olay meta'sı gövde taşımaz (gizlilik).
+- Olay akışı: `work_order_events` (created/state_changed/assigned/unassigned/cancelled/note_added/updated) + önemli adımlar müşteri/varlık zaman çizelgesine (`crm_events`) + audit kayıtları.
+- RLS: 8 yeni tabloda FORCE politikaları (uygulama rolü dahil); çapraz-kiracı okuma/yazma/geçiş 404 + ham RLS kanıtı.
+- Web: talep gelen kutusu (+yeni talep çekmecesi), talep detayı (bilgiler/triyaj/dönüşüm/iptal/etkinlikler), iş emri listesi (+yeni İE çekmecesi, durum filtresi), İE detayı (eylem paneli: durum makinesi düğmeleri yetkiye göre; planlama/atama çekmeceleri; notlar; atama geçmişi; zaman çizelgesi; düzenleme); yetkiye dayalı navigasyon (teknisyen: talepler gizli).
+- ui-web: Timeline bileşeni (ton kodlu olay akışı, ol semantiği) + stories + etkileşim testleri; api-client: servis akışı typed istemcisi (liste/detay/mutasyonlar, girdi doğrulamalı hata sonuçları).
+- Sözleşmeler: service.ts (enum'lar, şemalar, görünümler, liste zarfları, UI etiket haritaları, görünür geçiş tablosu — API makinesiyle birebirlik testli).
+- Testler: 280 birim (+50) + 109 entegrasyon (+37: intake 15 + iş emirleri 22) + 55 Storybook (+4) + 34 E2E (+6: yaşam döngüsü/iptal/rol/mobil); E2E zinciri seri modda (fullyParallel RUN uyuşmazlığı çözüldü).
+- TEST-05 kapısı: PASS (`docs/reports/PHASE-05-REPORT.md`); 8 ekran görüntüsü `docs/screenshots/phase-05/`.
+
 ## 0.4.0 — Phase 04: CRM, contacts, locations and equipment registry
 
 - Müşteri kayıt defteri: CRUD (silme = arşivleme), normalize duyarlı arama (Türkçe İ/ı), durum filtresi, sayfalama; birincil kontakla birlikte oluşturma.

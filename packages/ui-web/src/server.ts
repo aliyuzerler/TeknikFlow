@@ -27,3 +27,10 @@ export { DetailList, type DetailItem, type DetailListProps } from './components/
 // Pager 'use client' dosyasıdır; sunucu sayfalarından serileştirilebilir
 // props'larla (hrefTemplate) güvenle kullanılır (client reference).
 export { Pager, type PagerProps } from './components/pager.js';
+// Faz 05: Timeline — hooksuz sunum bileşeni (RSC-güvenli).
+export {
+  Timeline,
+  type TimelineItem,
+  type TimelineProps,
+  type TimelineTone,
+} from './components/timeline.js';

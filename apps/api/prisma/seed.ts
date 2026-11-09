@@ -1,5 +1,9 @@
 import { CreateBucketCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import {
+  PrismaClient,
+  type Prisma,
+  type WorkOrderStatus as WorkOrderStatusEnum,
+} from '@prisma/client';
 import { retryWithBackoff } from '@teknikflow/shared';
 import { getEnv } from '../src/config/env.js';
 import { seedPlans, seedRbacCatalogue } from '../src/rbac/rbac-catalogue.seed.js';
@@ -201,6 +205,9 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
 
     // ---- Faz 04: demo CRM verisi (docs/DEMO_SEED_DATA.md — kurgusal) ----
     await seedDemoCrm(tx, tenant.id, ownerUserId ?? '');
+
+    // ---- Faz 05: demo servis akışı (talepler + iş emirleri) ----
+    await seedDemoService(tx, tenant.id, ownerUserId ?? '');
   });
 
   console.log(
@@ -458,3 +465,589 @@ main().catch((error) => {
   console.error('[seed] Başarısız:', error);
   process.exit(1);
 });
+
+/**
+ * Faz 05 — demo servis akışı verisi (docs/DEMO_SEED_DATA.md — kurgusal):
+ * kategoriler, SLA politikaları, 3 servis talebi ve 8 iş emri (tüm ana
+ * durumlarda). Numaralar deterministiktir (WO-YYYY-0001..0008) ve sayaç
+ * tablosu senkron tutulur; koşum idempotenttir (upsert + yalnız ilk
+ * tohumlamada olay/not yazılır).
+ */
+async function seedDemoService(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  ownerId: string,
+): Promise<void> {
+  const { normalizeName } = await import('../src/crm/crm-utils.js');
+
+  // ---- Kategoriler ----
+  const categories: Array<{ key: string; name: string; description: string }> = [
+    { key: 'hvac', name: 'İklimlendirme', description: 'Soğutma, ısıtma ve havalandırma' },
+    { key: 'electrical', name: 'Elektrik', description: 'Elektrik panosu ve güç sistemleri' },
+    { key: 'mechanical', name: 'Mekanik', description: 'Pompa, kompresör ve mekanik parçalar' },
+    { key: 'plumbing', name: 'Tesisat', description: 'Su ve sıhhi tesisat' },
+    { key: 'inspection', name: 'Periyodik Muayene', description: 'Bakım ve denetim kontrolleri' },
+    { key: 'other', name: 'Diğer', description: 'Sınıflandırılmamış talepler' },
+  ];
+  for (const category of categories) {
+    await tx.serviceCategory.upsert({
+      where: { tenantId_key: { tenantId, key: category.key } },
+      create: { tenantId, ...category },
+      update: { name: category.name, description: category.description },
+    });
+  }
+
+  // ---- SLA politikaları (dakika) ----
+  const slaPolicies: Array<{
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    resolveMinutes: number;
+  }> = [
+    { priority: 'URGENT', resolveMinutes: 240 },
+    { priority: 'HIGH', resolveMinutes: 480 },
+    { priority: 'MEDIUM', resolveMinutes: 1440 },
+    { priority: 'LOW', resolveMinutes: 4320 },
+  ];
+  for (const policy of slaPolicies) {
+    await tx.slaPolicy.upsert({
+      where: { tenantId_priority: { tenantId, priority: policy.priority } },
+      create: { tenantId, ...policy },
+      update: { resolveMinutes: policy.resolveMinutes },
+    });
+  }
+
+  const categoryByKey = new Map(
+    (await tx.serviceCategory.findMany({ where: { tenantId } })).map((c) => [c.key, c]),
+  );
+  const customerByName = new Map(
+    (await tx.customer.findMany({ where: { tenantId } })).map((c) => [c.nameNormalized, c]),
+  );
+  const assetByTag = new Map(
+    (await tx.asset.findMany({ where: { tenantId } })).map((a) => [a.assetTag, a]),
+  );
+  const branches = await tx.branch.findMany({ where: { tenantId } });
+  const branchByCode = new Map(branches.map((b) => [b.code, b]));
+
+  // Teknisyenler (atamalar için).
+  const technicianRole = await tx.role.findFirstOrThrow({
+    where: { key: 'technician', tenantId: null },
+  });
+  const technicianMemberships = await tx.membership.findMany({
+    where: { tenantId, roleId: technicianRole.id, status: 'ACTIVE' },
+    include: { user: true },
+  });
+  const technicianByName = new Map(
+    technicianMemberships.map((m) => [m.user.displayName, m.user.id]),
+  );
+  const emre = technicianByName.get('Emre Yılmaz') ?? ownerId;
+  const selin = technicianByName.get('Selin Arslan') ?? emre;
+
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  const year = new Date().getUTCFullYear();
+  const no = (n: number) => `WO-${year}-${String(n).padStart(4, '0')}`;
+
+  // ---- 3 servis talebi ----
+  const requestSpecs: Array<{
+    customer: string;
+    assetTag: string;
+    categoryKey: string;
+    source: 'PORTAL' | 'OFFICE' | 'EMAIL' | 'API';
+    subject: string;
+    description: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    status: 'NEW' | 'IN_REVIEW' | 'CONVERTED' | 'CANCELLED';
+    createdAtDaysAgo: number;
+    linkedWorkOrderNo?: number;
+  }> = [
+    {
+      customer: 'MARMARA GIDA FABRIKASI',
+      assetTag: 'AST-DM001',
+      categoryKey: 'mechanical',
+      source: 'PORTAL',
+      subject: 'Kompresör yüksek ses ve titreşim',
+      description: 'Üretim hattı kompresörü anormal ses çıkarıyor; titreşim artmış durumda.',
+      priority: 'URGENT',
+      status: 'NEW',
+      createdAtDaysAgo: 0.2,
+    },
+    {
+      customer: 'KUZEY PLAZA YÖNETİMİ',
+      assetTag: 'AST-DM004',
+      categoryKey: 'hvac',
+      source: 'EMAIL',
+      subject: 'Santral periyodik bakım talebi',
+      description: 'A blok HVAC santrali için yıllık bakım planlanmak isteniyor.',
+      priority: 'MEDIUM',
+      status: 'IN_REVIEW',
+      createdAtDaysAgo: 1,
+    },
+    {
+      customer: 'EKSEN MAKINE',
+      assetTag: 'AST-DM005',
+      categoryKey: 'mechanical',
+      source: 'OFFICE',
+      subject: 'CNC soğutma ünitesi aşırı ısınıyor',
+      description: 'CNC soğutma ünitesi uzun devrelerde aşırı ısınma korumasına giriyor.',
+      priority: 'HIGH',
+      status: 'CONVERTED',
+      createdAtDaysAgo: 3,
+      linkedWorkOrderNo: 3,
+    },
+  ];
+
+  for (const spec of requestSpecs) {
+    const existing = await tx.serviceRequest.findFirst({
+      where: { tenantId, subject: spec.subject },
+      select: { id: true, convertedWorkOrder: { select: { id: true } } },
+    });
+    if (existing) continue;
+    const customer = customerByName.get(normalizeName(spec.customer));
+    if (!customer) continue;
+    const asset = assetByTag.get(spec.assetTag) ?? null;
+    const category = categoryByKey.get(spec.categoryKey) ?? null;
+    const createdAt = new Date(now - spec.createdAtDaysAgo * DAY);
+    const resolveMinutes =
+      slaPolicies.find((p) => p.priority === spec.priority)?.resolveMinutes ?? 1440;
+    await tx.serviceRequest.create({
+      data: {
+        tenantId,
+        customerId: customer.id,
+        assetId: asset?.id ?? null,
+        categoryId: category?.id ?? null,
+        source: spec.source,
+        subject: spec.subject,
+        description: spec.description,
+        priority: spec.priority,
+        status: spec.status,
+        slaDueAt: new Date(createdAt.getTime() + resolveMinutes * 60_000),
+        createdById: ownerId,
+        createdAt,
+        updatedAt: createdAt,
+      },
+    });
+    await tx.crmEvent.create({
+      data: {
+        tenantId,
+        customerId: customer.id,
+        assetId: asset?.id ?? null,
+        eventType: 'service_request.created',
+        actorId: ownerId,
+        metadataJson: {
+          seeded: true,
+          subject: spec.subject,
+          priority: spec.priority,
+          requestId: (
+            await tx.serviceRequest.findFirst({
+              where: { tenantId, subject: spec.subject },
+              select: { id: true },
+            })
+          )?.id,
+        },
+        occurredAt: createdAt,
+      },
+    });
+  }
+
+  // ---- 8 iş emri: tüm ana durumlar ----
+  interface WoSpec {
+    n: number;
+    customer: string;
+    assetTag: string;
+    branchCode: string;
+    type: 'CORRECTIVE' | 'PREVENTIVE' | 'INSTALLATION' | 'INSPECTION' | 'OTHER';
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    status:
+      | 'DRAFT'
+      | 'PLANNED'
+      | 'ASSIGNED'
+      | 'ACCEPTED'
+      | 'EN_ROUTE'
+      | 'ON_SITE'
+      | 'IN_PROGRESS'
+      | 'WAITING_PARTS'
+      | 'WAITING_CUSTOMER'
+      | 'COMPLETED'
+      | 'CLOSED'
+      | 'CANCELLED';
+    subject: string;
+    description: string;
+    assignee?: string;
+    createdDaysAgo: number;
+    scheduleStartInDays?: number;
+    scheduleHours?: number;
+    cancelledFrom?: string;
+    reason?:
+      | 'CUSTOMER_REQUEST'
+      | 'DUPLICATE'
+      | 'OUT_OF_SCOPE'
+      | 'PARTS_UNAVAILABLE'
+      | 'SCHEDULE_CONFLICT'
+      | 'OTHER';
+  }
+  const woSpecs: WoSpec[] = [
+    {
+      n: 1,
+      customer: 'EKSEN MAKINE',
+      assetTag: 'AST-DM006',
+      branchCode: 'IST-MRKZ',
+      type: 'PREVENTIVE',
+      priority: 'MEDIUM',
+      status: 'CLOSED',
+      subject: 'Jeneratör yıllık bakımı',
+      description: 'Yıllık önleyici bakım: yağ ve filtre değişimi, yük testi.',
+      assignee: emre,
+      createdDaysAgo: 20,
+      scheduleStartInDays: -18,
+      scheduleHours: 4,
+    },
+    {
+      n: 2,
+      customer: 'KUZEY PLAZA YÖNETİMİ',
+      assetTag: 'AST-DM004',
+      branchCode: 'IST-MRKZ',
+      type: 'CORRECTIVE',
+      priority: 'HIGH',
+      status: 'COMPLETED',
+      subject: 'Santral filtre değişimi ve kontrol',
+      description: 'Filtre seti değişimi, kayış kontrolü ve genel performans testi.',
+      assignee: selin,
+      createdDaysAgo: 5,
+      scheduleStartInDays: -1,
+      scheduleHours: 3,
+    },
+    {
+      n: 3,
+      customer: 'EKSEN MAKINE',
+      assetTag: 'AST-DM005',
+      branchCode: 'IST-MRKZ',
+      type: 'CORRECTIVE',
+      priority: 'HIGH',
+      status: 'WAITING_PARTS',
+      subject: 'CNC soğutma ünitesi aşırı ısınma arızası',
+      description: 'Isı eşanjörü tıkalı; yedek parça (eşanjör) tedariki bekleniyor.',
+      assignee: emre,
+      createdDaysAgo: 3,
+      scheduleStartInDays: -2,
+      scheduleHours: 4,
+    },
+    {
+      n: 4,
+      customer: 'MARMARA GIDA FABRIKASI',
+      assetTag: 'AST-DM001',
+      branchCode: 'IST-MRKZ',
+      type: 'CORRECTIVE',
+      priority: 'URGENT',
+      status: 'ASSIGNED',
+      subject: 'Kompresör acil arıza girişimi',
+      description: 'Yüksek ses ve titreşim; muhtemel yatak aşınması.',
+      assignee: emre,
+      createdDaysAgo: 0.5,
+      scheduleStartInDays: 0.5,
+      scheduleHours: 4,
+    },
+    {
+      n: 5,
+      customer: 'MARMARA Gıda FABRIKASI',
+      assetTag: 'AST-DM002',
+      branchCode: 'IST-MRKZ',
+      type: 'CORRECTIVE',
+      priority: 'MEDIUM',
+      status: 'IN_PROGRESS',
+      subject: 'Çatı ünitesi sızıntı onarımı',
+      description: 'Soğuk hava deposu çatı ünitesinde refrigerant sızıntısı.',
+      assignee: selin,
+      createdDaysAgo: 2,
+      scheduleStartInDays: -0.2,
+      scheduleHours: 6,
+    },
+    {
+      n: 6,
+      customer: 'KUZEY PLAZA YÖNETİMİ',
+      assetTag: 'AST-DM004',
+      branchCode: 'ANK-SRVS',
+      type: 'INSPECTION',
+      priority: 'LOW',
+      status: 'PLANNED',
+      subject: 'Yangın güvenlik panosu denetimi',
+      description: 'Yıllık elektrik panosu termal kamera denetimi.',
+      createdDaysAgo: 1,
+      scheduleStartInDays: 3,
+      scheduleHours: 2,
+    },
+    {
+      n: 7,
+      customer: 'EKSEN MAKINE',
+      assetTag: 'AST-DM006',
+      branchCode: 'IST-MRKZ',
+      type: 'CORRECTIVE',
+      priority: 'LOW',
+      status: 'CANCELLED',
+      subject: 'Jeneratör ses yalıtımı (mükerrer)',
+      description: 'Mükerrer talep — yıllık bakım kapsamında ele alındı.',
+      createdDaysAgo: 10,
+      cancelledFrom: 'DRAFT',
+      reason: 'DUPLICATE',
+    },
+    {
+      n: 8,
+      customer: 'MARMARA Gıda FABRIKASI',
+      assetTag: 'AST-DM003',
+      branchCode: 'IST-MRKZ',
+      type: 'INSTALLATION',
+      priority: 'MEDIUM',
+      status: 'DRAFT',
+      subject: 'Pompa debi ölçer kurulumu',
+      description: 'Soğuk hava deposu pompa hattına debi ölçer takılması.',
+      createdDaysAgo: 1,
+    },
+  ];
+
+  // Durum yolları: hedefe ulaşmak için atılan adımlar (olay/roller için).
+  const STATUS_PATH: Record<string, string[]> = {
+    DRAFT: [],
+    PLANNED: ['PLANNED'],
+    ASSIGNED: ['PLANNED', 'ASSIGNED'],
+    ACCEPTED: ['PLANNED', 'ASSIGNED', 'ACCEPTED'],
+    EN_ROUTE: ['PLANNED', 'ASSIGNED', 'ACCEPTED', 'EN_ROUTE'],
+    ON_SITE: ['PLANNED', 'ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ON_SITE'],
+    IN_PROGRESS: ['PLANNED', 'ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ON_SITE', 'IN_PROGRESS'],
+    WAITING_PARTS: [
+      'PLANNED',
+      'ASSIGNED',
+      'ACCEPTED',
+      'EN_ROUTE',
+      'ON_SITE',
+      'IN_PROGRESS',
+      'WAITING_PARTS',
+    ],
+    WAITING_CUSTOMER: [
+      'PLANNED',
+      'ASSIGNED',
+      'ACCEPTED',
+      'EN_ROUTE',
+      'ON_SITE',
+      'IN_PROGRESS',
+      'WAITING_CUSTOMER',
+    ],
+    COMPLETED: [
+      'PLANNED',
+      'ASSIGNED',
+      'ACCEPTED',
+      'EN_ROUTE',
+      'ON_SITE',
+      'IN_PROGRESS',
+      'COMPLETED',
+    ],
+    CLOSED: [
+      'PLANNED',
+      'ASSIGNED',
+      'ACCEPTED',
+      'EN_ROUTE',
+      'ON_SITE',
+      'IN_PROGRESS',
+      'COMPLETED',
+      'CLOSED',
+    ],
+    CANCELLED: ['CANCELLED'],
+  };
+
+  for (const spec of woSpecs) {
+    const existing = await tx.workOrder.findFirst({
+      where: { tenantId, workOrderNo: no(spec.n) },
+      select: { id: true },
+    });
+    if (existing) continue;
+    const customer = customerByName.get(normalizeName(spec.customer));
+    if (!customer) continue;
+    const asset = assetByTag.get(spec.assetTag) ?? null;
+    const branch = branchByCode.get(spec.branchCode) ?? null;
+    const createdAt = new Date(now - spec.createdDaysAgo * DAY);
+    const scheduledStart =
+      spec.scheduleStartInDays !== undefined
+        ? new Date(now + spec.scheduleStartInDays * DAY)
+        : null;
+    const scheduledEnd =
+      scheduledStart && spec.scheduleHours
+        ? new Date(scheduledStart.getTime() + spec.scheduleHours * 60 * 60 * 1000)
+        : null;
+
+    // Talep bağlantısı (dönüşüm talebi → 3. iş emri).
+    const linkedSubject = spec.n === 3 ? 'CNC soğutma ünitesi aşırı ısınıyor' : null;
+    const linkedRequest = linkedSubject
+      ? await tx.serviceRequest.findFirst({ where: { tenantId, subject: linkedSubject } })
+      : null;
+
+    const created = await tx.workOrder.create({
+      data: {
+        tenantId,
+        workOrderNo: no(spec.n),
+        ...(linkedRequest ? { requestId: linkedRequest.id } : {}),
+        customerId: customer.id,
+        assetId: asset?.id ?? null,
+        branchId: branch?.id ?? null,
+        type: spec.type,
+        priority: spec.priority,
+        status: spec.status,
+        subject: spec.subject,
+        description: spec.description,
+        scheduledStart,
+        scheduledEnd,
+        assignedToId: spec.assignee ?? null,
+        version: (STATUS_PATH[spec.status] ?? []).length,
+        createdById: ownerId,
+        createdAt,
+        updatedAt: createdAt,
+        ...(spec.status === 'ASSIGNED' || spec.status === 'ACCEPTED' || spec.status === 'EN_ROUTE'
+          ? { acceptedAt: new Date(createdAt.getTime() + 30 * 60_000) }
+          : {}),
+        ...(spec.status === 'EN_ROUTE' ||
+        spec.status === 'ON_SITE' ||
+        spec.status === 'IN_PROGRESS' ||
+        spec.status === 'WAITING_PARTS' ||
+        spec.status === 'WAITING_CUSTOMER' ||
+        spec.status === 'COMPLETED' ||
+        spec.status === 'CLOSED'
+          ? {
+              acceptedAt: new Date(createdAt.getTime() + 30 * 60_000),
+              startedAt: new Date(createdAt.getTime() + 2 * 60 * 60_000),
+            }
+          : {}),
+        ...(spec.status === 'COMPLETED' || spec.status === 'CLOSED'
+          ? {
+              completedAt: new Date(createdAt.getTime() + 6 * 60 * 60_000),
+            }
+          : {}),
+        ...(spec.status === 'CLOSED'
+          ? { closedAt: new Date(createdAt.getTime() + 8 * 60 * 60_000) }
+          : {}),
+        ...(spec.status === 'CANCELLED'
+          ? {
+              cancelledAt: new Date(createdAt.getTime() + 2 * 60 * 60_000),
+              cancellationReason: spec.reason ?? 'OTHER',
+              cancellationNote: 'Demo iptal kaydı',
+            }
+          : {}),
+      },
+    });
+
+    // Atama geçmişi + olaylar (yalnız ilk tohumlamada).
+    await tx.workOrderEvent.create({
+      data: {
+        tenantId,
+        workOrderId: created.id,
+        eventType: 'work_order.created',
+        toState: 'DRAFT',
+        actorId: ownerId,
+        metadataJson: { seeded: true },
+        occurredAt: createdAt,
+      },
+    });
+    let previous = 'DRAFT';
+    let step = 0;
+    for (const state of STATUS_PATH[spec.status] ?? []) {
+      step += 1;
+      const at = new Date(createdAt.getTime() + step * 45 * 60_000);
+      await tx.workOrderEvent.create({
+        data: {
+          tenantId,
+          workOrderId: created.id,
+          eventType: 'work_order.state_changed',
+          fromState: previous as WorkOrderStatusEnum,
+          toState: state as WorkOrderStatusEnum,
+          actorId: state === 'ASSIGNED' ? ownerId : (spec.assignee ?? ownerId),
+          metadataJson: { seeded: true },
+          occurredAt: at,
+        },
+      });
+      if (state === 'ASSIGNED' && spec.assignee) {
+        await tx.workOrderAssignment.create({
+          data: {
+            tenantId,
+            workOrderId: created.id,
+            userId: spec.assignee,
+            assignedById: ownerId,
+            status: 'ACTIVE',
+            assignedAt: at,
+          },
+        });
+        await tx.workOrderEvent.create({
+          data: {
+            tenantId,
+            workOrderId: created.id,
+            eventType: 'work_order.assigned',
+            actorId: ownerId,
+            metadataJson: { assigneeUserId: spec.assignee, seeded: true },
+            occurredAt: at,
+          },
+        });
+      }
+      previous = state;
+    }
+
+    if (linkedRequest) {
+      await tx.serviceRequest.update({
+        where: { id: linkedRequest.id },
+        data: { status: 'CONVERTED', updatedAt: new Date() },
+      });
+    }
+
+    // CRM zaman çizelgesine önemli adımlar.
+    for (const major of ['COMPLETED', 'CLOSED', 'CANCELLED']) {
+      if (spec.status === major) {
+        await tx.crmEvent.create({
+          data: {
+            tenantId,
+            customerId: customer.id,
+            assetId: asset?.id ?? null,
+            eventType: `work_order.${major.toLowerCase()}`,
+            actorId: spec.assignee ?? ownerId,
+            metadataJson: { seeded: true, workOrderNo: no(spec.n) },
+            occurredAt: createdAt,
+          },
+        });
+      }
+    }
+  }
+
+  // Notlar (2 dahili + 1 müşteri görünür) — yalnız yeni iş emirlerinde.
+  const wo3 = await tx.workOrder.findFirst({ where: { tenantId, workOrderNo: no(3) } });
+  if (wo3 && !(await tx.workOrderNote.findFirst({ where: { workOrderId: wo3.id } }))) {
+    await tx.workOrderNote.createMany({
+      data: [
+        {
+          tenantId,
+          workOrderId: wo3.id,
+          authorId: emre,
+          body: 'Eşanjör temizlendi; yedek parça tedarik süresi 3 iş günü.',
+          visibility: 'INTERNAL',
+        },
+        {
+          tenantId,
+          workOrderId: wo3.id,
+          authorId: ownerId,
+          body: 'Müşteri parça süreci hakkında bilgilendirildi.',
+          visibility: 'CUSTOMER',
+        },
+      ],
+    });
+  }
+
+  // Sayaç: deterministik numaraların üzerinde (sonraki üretim 0009'dan).
+  const maxNo = woSpecs.length;
+  const currentYear = new Date().getUTCFullYear();
+  const counter = await tx.workOrderCounter.findUnique({
+    where: { tenantId_year: { tenantId, year: currentYear } },
+  });
+  if (!counter || counter.lastNumber < maxNo) {
+    await tx.workOrderCounter.upsert({
+      where: { tenantId_year: { tenantId, year: currentYear } },
+      create: { tenantId, year: currentYear, lastNumber: maxNo },
+      update: { lastNumber: maxNo },
+    });
+  }
+
+  console.log(
+    `[seed] Faz 05 demo: ${categories.length} kategori, ${slaPolicies.length} SLA politikası, ` +
+      `3 talep + 8 iş emri (WO-${year}-0001..0008)`,
+  );
+}

@@ -1486,3 +1486,95 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Olay akışı / zaman çizelgesi (Timeline) ---------- */
+.tf-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.tf-timeline__item {
+  display: flex;
+  gap: var(--tf-space-3);
+  position: relative;
+  padding: 0 0 var(--tf-space-5) var(--tf-space-1);
+}
+
+.tf-timeline__item:last-child {
+  padding-bottom: 0;
+}
+
+/* Dikey bağlantı çizgisi — son kayıtta kesilir. */
+.tf-timeline__item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--tf-border);
+}
+
+.tf-timeline__dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: var(--tf-muted);
+  border: 3px solid var(--tf-surface, #fff);
+  box-shadow: 0 0 0 2px var(--tf-border);
+}
+
+.tf-timeline__item--info .tf-timeline__dot {
+  background: var(--tf-info);
+}
+.tf-timeline__item--success .tf-timeline__dot {
+  background: var(--tf-success);
+}
+.tf-timeline__item--warning .tf-timeline__dot {
+  background: var(--tf-warning);
+}
+.tf-timeline__item--danger .tf-timeline__dot {
+  background: var(--tf-danger);
+}
+
+.tf-timeline__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.tf-timeline__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tf-space-1) var(--tf-space-3);
+}
+
+.tf-timeline__title {
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+  overflow-wrap: anywhere;
+}
+
+.tf-timeline__meta {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+  margin-left: auto;
+}
+
+.tf-timeline__desc {
+  margin-top: 2px;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-muted);
+  overflow-wrap: anywhere;
+}
+
+.tf-timeline__empty {
+  font-size: var(--tf-text-sm);
+  color: var(--tf-muted);
+  margin: 0;
+}
