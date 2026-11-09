@@ -1,5 +1,5 @@
 import { CreateBucketCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { retryWithBackoff } from '@teknikflow/shared';
 import { getEnv } from '../src/config/env.js';
 import { seedPlans, seedRbacCatalogue } from '../src/rbac/rbac-catalogue.seed.js';
@@ -161,6 +161,7 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
       },
     ];
 
+    let ownerUserId: string | undefined;
     for (const user of users) {
       const account = await tx.user.upsert({
         where: { emailNormalized: user.email },
@@ -176,6 +177,7 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
       const role = await tx.role.findFirstOrThrow({
         where: { key: user.role, tenantId: null },
       });
+      if (user.role === 'owner') ownerUserId = account.id;
       await tx.membership.upsert({
         where: { tenantId_userId: { tenantId: tenant.id, userId: account.id } },
         create: {
@@ -196,11 +198,260 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
       create: { key: 'demo.tenantSlug', value: 'atlas-teknik-servis' },
       update: { value: 'atlas-teknik-servis' },
     });
+
+    // ---- Faz 04: demo CRM verisi (docs/DEMO_SEED_DATA.md — kurgusal) ----
+    await seedDemoCrm(tx, tenant.id, ownerUserId ?? '');
   });
 
   console.log(
-    `[seed] Demo kiracı 'atlas-teknik-servis': 2 şube, 8 kullanıcı (parola: DEMO_SEED_PASSWORD)`,
+    `[seed] Demo kiracı 'atlas-teknik-servis': 2 şube, 8 kullanıcı + demo CRM (parola: DEMO_SEED_PASSWORD)`,
   );
+}
+
+/**
+ * Demo CRM verisi: 3 müşteri, kişiler, lokasyonlar, ekipmanlar ve olaylar.
+ * Etiketler AST-DMxx biçiminde (deterministik — E2E/testler bunlara güvenebilir).
+ */
+async function seedDemoCrm(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  ownerId: string,
+): Promise<void> {
+  const { normalizeName } = await import('../src/crm/crm-utils.js');
+
+  const customers: Array<{
+    name: string;
+    taxId: string;
+    billingAddress: string;
+    contacts: Array<{ name: string; email: string; phone: string }>;
+    locations: Array<{
+      name: string;
+      address: string;
+      city: string;
+      district: string;
+      latitude: number;
+      longitude: number;
+    }>;
+    assets: Array<{
+      tag: string;
+      manufacturer: string;
+      model: string;
+      serial: string;
+      locationIdx: number;
+      criticality: 'LOW' | 'MEDIUM' | 'HIGH';
+    }>;
+  }> = [
+    {
+      name: 'Marmara Gıda Fabrikası',
+      taxId: '1234567801',
+      billingAddress: 'Gebze OSB, 200. Sk. No:14, Kocaeli',
+      contacts: [
+        {
+          name: 'Deniz Aydın',
+          email: 'deniz.aydin@marmaragida.example.test',
+          phone: '+905321110001',
+        },
+        { name: 'Kemal Gür', email: 'kemal.gur@marmaragida.example.test', phone: '+905321110002' },
+      ],
+      locations: [
+        {
+          name: 'Ana Üretim Tesisi',
+          address: 'Gebze OSB, 200. Sk. No:14',
+          city: 'Kocaeli',
+          district: 'Gebze',
+          latitude: 40.8003,
+          longitude: 29.4395,
+        },
+        {
+          name: 'Soğuk Hava Deposu',
+          address: 'Gebze OSB, 202. Sk. No:3',
+          city: 'Kocaeli',
+          district: 'Gebze',
+          latitude: 40.8021,
+          longitude: 29.4368,
+        },
+      ],
+      assets: [
+        {
+          tag: 'AST-DM001',
+          manufacturer: 'Bock',
+          model: 'HGZ5 Compressor',
+          serial: 'SN-BOCK-001',
+          locationIdx: 0,
+          criticality: 'HIGH',
+        },
+        {
+          tag: 'AST-DM002',
+          manufacturer: 'Carrier',
+          model: '30RQ Rooftop',
+          serial: 'SN-CARR-002',
+          locationIdx: 0,
+          criticality: 'MEDIUM',
+        },
+        {
+          tag: 'AST-DM003',
+          manufacturer: 'Grundfos',
+          model: 'NB 65-200 Pump',
+          serial: 'SN-GRUN-003',
+          locationIdx: 1,
+          criticality: 'MEDIUM',
+        },
+      ],
+    },
+    {
+      name: 'Kuzey Plaza Yönetimi',
+      taxId: '1234567802',
+      billingAddress: 'Levent Mah. Büyükdere Cad. No:87, İstanbul',
+      contacts: [
+        { name: 'Sibel Ak', email: 'sibel.ak@kuzeyplaza.example.test', phone: '+905322220001' },
+      ],
+      locations: [
+        {
+          name: 'Kuzey Plaza A Blok',
+          address: 'Büyükdere Cad. No:87',
+          city: 'İstanbul',
+          district: 'Levent',
+          latitude: 41.0811,
+          longitude: 29.0249,
+        },
+      ],
+      assets: [
+        {
+          tag: 'AST-DM004',
+          manufacturer: 'Daikin',
+          model: 'HVAC Santral-02',
+          serial: 'SN-DAIK-004',
+          locationIdx: 0,
+          criticality: 'HIGH',
+        },
+      ],
+    },
+    {
+      name: 'Eksen Makine',
+      taxId: '1234567803',
+      billingAddress: 'İkitelli OSB, Metal Sk. No:22, İstanbul',
+      contacts: [
+        { name: 'Ferhat Öz', email: 'ferhat.oz@eksenmakine.example.test', phone: '+905323330001' },
+      ],
+      locations: [
+        {
+          name: 'Üretim Atölyesi',
+          address: 'İkitelli OSB, Metal Sk. No:22',
+          city: 'İstanbul',
+          district: 'İkitelli',
+          latitude: 41.0736,
+          longitude: 28.8069,
+        },
+      ],
+      assets: [
+        {
+          tag: 'AST-DM005',
+          manufacturer: 'Haas',
+          model: 'CNC Soğutma Ünitesi',
+          serial: 'SN-HAAS-005',
+          locationIdx: 0,
+          criticality: 'HIGH',
+        },
+        {
+          tag: 'AST-DM006',
+          manufacturer: 'Cat',
+          model: 'Jeneratör-01',
+          serial: 'SN-CAT-006',
+          locationIdx: 0,
+          criticality: 'MEDIUM',
+        },
+      ],
+    },
+  ];
+
+  for (const customer of customers) {
+    const before = await tx.customer.findFirst({
+      where: { tenantId, nameNormalized: normalizeName(customer.name) },
+      select: { id: true },
+    });
+    const created = await tx.customer.upsert({
+      where: {
+        tenantId_nameNormalized: { tenantId, nameNormalized: normalizeName(customer.name) },
+      },
+      create: {
+        tenantId,
+        name: customer.name,
+        nameNormalized: normalizeName(customer.name),
+        taxId: customer.taxId,
+        billingAddress: customer.billingAddress,
+        createdById: ownerId,
+      },
+      update: {},
+    });
+    const isNew = !before;
+
+    for (const contact of customer.contacts) {
+      const emailNormalized = contact.email.toLowerCase();
+      await tx.contact.upsert({
+        where: {
+          tenantId_customerId_emailNormalized: {
+            tenantId,
+            customerId: created.id,
+            emailNormalized,
+          },
+        },
+        create: {
+          tenantId,
+          customerId: created.id,
+          name: contact.name,
+          email: contact.email,
+          emailNormalized,
+          phone: contact.phone,
+        },
+        update: {},
+      });
+    }
+
+    const locationIds: string[] = [];
+    for (const location of customer.locations) {
+      const existing = await tx.serviceLocation.findFirst({
+        where: { tenantId, customerId: created.id, address: location.address },
+      });
+      const saved = existing
+        ? existing
+        : await tx.serviceLocation.create({
+            data: { tenantId, customerId: created.id, ...location },
+          });
+      locationIds.push(saved.id);
+    }
+
+    for (const asset of customer.assets) {
+      await tx.asset.upsert({
+        where: { tenantId_assetTag: { tenantId, assetTag: asset.tag } },
+        create: {
+          tenantId,
+          customerId: created.id,
+          serviceLocationId: locationIds[asset.locationIdx] ?? null,
+          assetTag: asset.tag,
+          serialNumber: asset.serial,
+          manufacturer: asset.manufacturer,
+          model: asset.model,
+          criticality: asset.criticality,
+          createdById: ownerId,
+        },
+        update: {},
+      });
+    }
+
+    if (isNew) {
+      // Olaylar yalnızca ilk tohumlamada yazılır (idempotent koşumlar
+      // zaman çizelgesini doldurmasın).
+      await tx.crmEvent.create({
+        data: {
+          tenantId,
+          customerId: created.id,
+          eventType: 'customer.created',
+          actorId: ownerId,
+          metadataJson: { seeded: true, name: customer.name },
+        },
+      });
+    }
+  }
 }
 
 main().catch((error) => {

@@ -72,6 +72,12 @@ model Tenant {
   branches     Branch[]
   invitations  Invitation[]
   auditLogs    AuditLog[]
+  customers    Customer[]
+  contacts     Contact[]
+  serviceLocations ServiceLocation[]
+  assets       Asset[]
+  assetDocuments AssetDocument[]
+  crmEvents    CrmEvent[]
   subscription Subscription?
   roles        Role[]
 
@@ -331,4 +337,186 @@ enum SubscriptionStatus {
   CANCELED
   INCOMPLETE
   @@map("subscription_status")
+}
+
+// ---------------------------------------------------------------------------
+// Faz 04 — CRM: müşteriler, kişiler, servis lokasyonları, ekipman envanteri
+// (docs/DATA_MODEL.md; tümü tenant-owned ve RLS ile korunur — migration'a bakın)
+// ---------------------------------------------------------------------------
+
+/// Müşteri (firma veya bireysel). nameNormalized: büyük harf + sıkıştırılmış
+/// boşluk — çift kayıt dedektörünün tekil anahtarıdır.
+model Customer {
+  id             String         @id @default(uuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  customerType   CustomerType   @default(COMPANY)
+  name           String
+  nameNormalized String
+  /// VKN/TCKN — opsiyonel. Alan düzeyi şifreleme Faz 15 kapsamında (kısıt kaydı).
+  taxId          String?
+  status         CustomerStatus @default(ACTIVE)
+  billingAddress String?
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  contacts        Contact[]
+  serviceLocations ServiceLocation[]
+  assets          Asset[]
+  crmEvents       CrmEvent[]
+
+  @@unique([tenantId, nameNormalized])
+  @@index([tenantId, status, createdAt])
+  @@map("customers")
+}
+
+enum CustomerType {
+  COMPANY
+  INDIVIDUAL
+  @@map("customer_type")
+}
+
+enum CustomerStatus {
+  ACTIVE
+  ARCHIVED
+  @@map("customer_status")
+}
+
+/// Müşteri kontak kişisi. Bildirim tercihleri Faz 12'ye kadar boş kalır.
+model Contact {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  customerId        String
+  customer          Customer @relation(fields: [customerId], references: [id])
+  name              String
+  email             String
+  emailNormalized   String
+  phone             String?
+  notificationPrefs Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([tenantId, customerId, emailNormalized])
+  @@index([tenantId, customerId])
+  @@map("contacts")
+}
+
+/// Servis lokasyonu — müşteriye bağlı fiziksel adres (+ isteğe bağlı koordinat).
+model ServiceLocation {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  name        String?
+  address     String
+  city        String?
+  district    String?
+  postalCode  String?
+  /// Koordinatlar derece cinsinden (±180/±90). PostGIS yerine iki sütun —
+  /// basit ve yeterli; hassasiyet ~1m (6 ondalık).
+  latitude    Float?
+  longitude   Float?
+  accessNotes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assets      Asset[]
+
+  @@index([tenantId, customerId])
+  @@map("service_locations")
+}
+
+/// Ekipman/varlık kaydı. assetTag kiracı içinde tekildir (QR kodun taşıdığı
+/// kimlik). Hiyerarşi: parentAsset ile alt ekipman ilişkisi.
+model Asset {
+  id                String            @id @default(uuid())
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  customerId        String
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  serviceLocationId String?
+  serviceLocation   ServiceLocation?  @relation(fields: [serviceLocationId], references: [id])
+  parentAssetId     String?
+  parentAsset       Asset?            @relation("AssetHierarchy", fields: [parentAssetId], references: [id])
+  childAssets       Asset[]           @relation("AssetHierarchy")
+  assetTag          String
+  serialNumber      String?
+  manufacturer      String?
+  model             String?
+  installedAt       DateTime?
+  warrantyUntil     DateTime?
+  status            AssetStatus       @default(ACTIVE)
+  criticality       AssetCriticality  @default(LOW)
+  metadataJson      Json              @default("{}")
+  createdById       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  documents AssetDocument[]
+  crmEvents CrmEvent[]
+
+  @@unique([tenantId, assetTag])
+  @@index([tenantId, customerId, createdAt])
+  @@index([tenantId, status])
+  @@map("assets")
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  RETIRED
+  @@map("asset_status")
+}
+
+enum AssetCriticality {
+  LOW
+  MEDIUM
+  HIGH
+  @@map("asset_criticality")
+}
+
+/// Varlık dokümanı — obje deposundaki dosyanın kiracı kapsamlı meta verisi.
+/// objectKey: tenants/{tenantId}/assets/{assetId}/{uuid} (opak, imzalı URL ile erişim).
+model AssetDocument {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  assetId      String
+  asset        Asset    @relation(fields: [assetId], references: [id])
+  objectKey    String
+  documentType String
+  fileName     String?
+  contentType  String?
+  sizeBytes    Int?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, assetId])
+  @@map("asset_documents")
+}
+
+/// CRM olay kaydı — müşteri zaman çizelgesi VE varlık geçmişinin tek kaynağı.
+/// eventType örnekleri: customer.created, customer.updated, contact.created,
+/// location.created, asset.created, asset.status_changed, asset.location_changed,
+/// asset.document_added, asset.imported.
+model CrmEvent {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  assetId      String?
+  asset        Asset?    @relation(fields: [assetId], references: [id])
+  eventType    String
+  actorId      String?
+  requestId    String?
+  metadataJson Json     @default("{}")
+  occurredAt   DateTime @default(now())
+
+  @@index([tenantId, customerId, occurredAt])
+  @@index([tenantId, assetId, occurredAt])
+  @@map("crm_events")
 }

@@ -164,10 +164,5 @@ export const AuditLogViewSchema = z.object({
 });
 export type AuditLogView = z.infer<typeof AuditLogViewSchema>;
 
-/** Sayfalama zarfı (docs/API_CONVENTIONS.md). */
-export const PageInfoSchema = z.object({
-  total: z.number().int().nonnegative(),
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
-});
-export type PageInfo = z.infer<typeof PageInfoSchema>;
+/** Sayfalama zarfı (docs/API_CONVENTIONS.md) — crm.ts'teki tanımla uyumlu. */
+export { PageInfoSchema, type PageInfo } from './crm.js';

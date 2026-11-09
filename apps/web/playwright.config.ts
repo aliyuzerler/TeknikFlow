@@ -31,9 +31,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    // E2E üretim derlemesi üzerinde koşar (dev modunda isteğe bağlı derleme
+    // takılmaları testleri kararsız yapar). reuseExistingServer sayesinde
+    // ayakta sunucu varsa yeniden derlenmez.
+    command: 'pnpm build && pnpm start',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
-    timeout: 120000,
+    timeout: 300000,
   },
 });

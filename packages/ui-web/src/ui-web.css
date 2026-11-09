@@ -1397,3 +1397,92 @@
 .tf-alert--danger .tf-alert__title {
   color: var(--tf-danger);
 }
+
+/* ---------- Sayfalama (Pager) ---------- */
+.tf-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tf-space-3);
+  padding: var(--tf-space-3) 0 0;
+}
+
+.tf-pager__info {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+}
+
+.tf-pager__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+}
+
+.tf-pager__btn {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  background: var(--tf-surface);
+  color: var(--tf-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tf-pager__btn:hover:not(.tf-pager__btn--disabled),
+.tf-pager__btn:focus-visible {
+  border-color: var(--tf-blue-600);
+}
+
+.tf-pager__btn--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tf-pager__current {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+  min-width: 56px;
+  text-align: center;
+}
+
+/* ---------- Tanım listesi (DetailList) ---------- */
+.tf-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tf-space-2) var(--tf-space-6);
+  margin: 0;
+}
+
+.tf-details--stack {
+  grid-template-columns: 1fr;
+}
+
+.tf-details__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tf-details__term {
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  color: var(--tf-muted);
+  letter-spacing: 0.2px;
+}
+
+.tf-details__desc {
+  margin: 0;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .tf-details {
+    grid-template-columns: 1fr;
+  }
+}

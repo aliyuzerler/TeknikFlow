@@ -127,12 +127,19 @@ test.describe('davet akışı (owner → yeni kullanıcı)', () => {
   }) => {
     const run = Date.now().toString(36);
     const inviteeEmail = `davetli-${run}@test.example`;
+    const ownerEmail = `davet-sahibi-${run}@test.example`;
+    const tenantName = `Davet Test ${run}`;
 
-    // Owner oturumu.
-    await page.goto('/login');
-    await page.locator('input[name="email"]').fill(OWNER_EMAIL);
+    // TAZE kiracı kur (demo kiracıda koltuk birikmesin; izolasyon da sınanır).
+    await page.goto('/signup');
+    await page.locator('input[name="tenantName"]').fill(tenantName);
+    await page.locator('input[name="displayName"]').fill('Davet Sahibi');
+    await page.locator('input[name="email"]').fill(ownerEmail);
     await page.locator('input[name="password"]').fill(PASSWORD);
-    await page.getByRole('button', { name: 'Giriş yap' }).click();
+    await page.getByRole('button', { name: 'Kiracı oluştur ve başla' }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Operasyon Genel Bakışı' }),
+    ).toBeVisible();
 
     await page.getByRole('link', { name: 'Kullanıcılar & Roller' }).click();
 
@@ -152,7 +159,7 @@ test.describe('davet akışı (owner → yeni kullanıcı)', () => {
 
     // Önizleme + kabul.
     await page.goto(inviteUrl);
-    await expect(page.getByText('Atlas Teknik Servis daveti')).toBeVisible();
+    await expect(page.getByText(`${tenantName} daveti`)).toBeVisible();
     await expect(page.getByText(inviteeEmail)).toBeVisible();
 
     await page.locator('input[name="password"]').fill('SahaServis2026');

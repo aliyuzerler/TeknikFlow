@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 — Phase 04: CRM, contacts, locations and equipment registry
+
+- Müşteri kayıt defteri: CRUD (silme = arşivleme), normalize duyarlı arama (Türkçe İ/ı), durum filtresi, sayfalama; birincil kontakla birlikte oluşturma.
+- Çift kayıt kuralları: nameNormalized (Türkçe duyarlı) tekil anahtar, vergi no, kişi e-postası, varlık etiketi, seri no (kısmi tekil indeks) — 409 + çakışan kaydın KENDİ kiracısındaki kimliği (details).
+- Kişiler ve servis lokasyonları: tam CRUD; koordinat doğrulama; bağlı varlık koruması (LOCATION_IN_USE).
+- Ekipman envanteri: üretici/model/seri/kritiklik; otomatik etiket (AST-XXXXXX — karışabilir karakter yok); üst-varlık hiyerarşisi; durum makinesi (ACTIVE/INACTIVE/RETIRED — silme = emeklilik); global + müşteri filtreli arama.
+- Varlık geçmişi + müşteri zaman çizelgesi: tek `crm_events` kaynağı (RLS'li), her mutasyon transaction içinde olay yazar (status_changed:FROM:TO gibi anlamlı türler).
+- QR varlık kimlikleri: SVG üretimi + kimlik doğrulamalı by-tag çözümleme (404 = sızıntı yok); derin bağlantı /a/{assetTag}.
+- Varlık dokümanları: meta veri + kısa ömürlü imzalı PUT/GET URL'leri (RustFS gidiş-dönüş testli); kiracı-kapsamlı opak objectKey.
+- CSV içe aktarma: başlık denetimli ayrıştırıcı (tırnak/çok satır), dry-run, dosya içi + DB çift kayıt denetimi, satır bazlı rapor, güvenli tekrar; import-template uç noktası.
+- RBAC genişlemesi: customers:manage + assets:manage (owner/admin/dispatcher/service-manager); any-of okuma modu (view_all|view_limited); teknisyen view_assigned Faz 05'e kadar fail-closed.
+- RLS: 6 yeni tabloda FORCE politikalar; FK'lı çapraz-kiracı referanslarına karşı servis katmanı doğrulaması.
+- Web: müşteri listesi (arama/sayfalama/yeni müşteri çekmecesi), müşteri detayı (bilgiler/kişiler/lokasyonlar/ekipmanlar/zaman çizelgesi + ekleme çekmeceleri), ekipman envanteri (filtrelerle), yetkiye dayalı navigasyon.
+- ui-web: Pager ('use client' + serileştirilebilir hrefTemplate — RSC güvenli) ve DetailList bileşenleri + stories/testler.
+- E2E üretim derlemesinde koşar (dev derleme takılmaları kararsızlık üretiyordu); 28/28.
+- TEST-04 kapısı: PASS (`docs/reports/PHASE-04-REPORT.md`); 10 ekran görüntüsü `docs/screenshots/phase-04/`.
+
 ## 0.3.0 — Phase 03: Identity, tenant isolation, RBAC and onboarding
 
 - Kimlik ve oturum (ADR-0002): Argon2id parola, web HttpOnly çerezli oturum + CSRF (çift-gönderim + Origin), mobil kısa ömürlü JWT + dönen refresh aileleri (yeniden kullanım tespiti aile iptali), oturum listeleme/tekil iptal/revoke-all, login-rate-limit (IP + e-posta kovası, PII yazılmaz).

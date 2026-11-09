@@ -26,7 +26,7 @@ export async function getSession(): Promise<WebSession | null> {
   const result = await fetchMe({
     baseUrl: apiBaseUrl,
     cookieHeader,
-    timeoutMs: 5000,
+    timeoutMs: 10_000,
   });
   if (!result.ok) return null;
   return { ...result.data, csrfToken: csrf };

@@ -66,12 +66,16 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
     // CSRF_INVALID, PLAN_LIMIT_EXCEEDED...) duruma göre türetilmiş genel kod
     // yerine o kod kullanılır — istemciler ayrım yapabilir.
     const code = extractCode(body) ?? codeForStatus(statusCode);
+    // Faz 04: güvenli ek bağlam alanları (çakışan kaydın KENDİ kiracısındaki
+    // kimliği vb.) — yalnız beyin listedeki anahtarlar taşınır.
+    const details = extractSafeDetails(body);
     return {
       code,
       message,
       requestId,
       statusCode,
       ...(fieldErrors ? { fieldErrors } : {}),
+      ...(details ? { details } : {}),
     };
   }
 
@@ -97,6 +101,26 @@ function extractMessage(body: string | object): string {
     }
   }
   return 'İstek reddedildi';
+}
+
+/**
+ * İstisna gövdesinden güvenli ek alanlar (varsa) — beyin liste dışı asla geçmez.
+ * Varlık sızıntısı yaratmaz: bu alanlar yalnız kendi kiracısındaki kayıtları
+ * refere eder (RLS zaten kiracı dışını 404'ler).
+ */
+function extractSafeDetails(body: string | object): Record<string, string | number> | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  const allowed = ['customerId', 'assetId', 'invitationId', 'assetCount', 'limit'];
+  const details: Record<string, string | number> = {};
+  for (const key of allowed) {
+    if (key in body) {
+      const value = (body as Record<string, unknown>)[key];
+      if (typeof value === 'string' || typeof value === 'number') {
+        details[key] = value;
+      }
+    }
+  }
+  return Object.keys(details).length > 0 ? details : undefined;
 }
 
 /** İstisna gövdesindeki açık kod (varsa) — genel kod yerine geçer. */

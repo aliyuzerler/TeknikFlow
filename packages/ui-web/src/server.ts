@@ -22,3 +22,8 @@ export {
   type PageHeaderProps,
 } from './components/page.js';
 export { Icon, type IconName, type IconProps } from './icons.js';
+export { DetailList, type DetailItem, type DetailListProps } from './components/detail-list.js';
+// Pager (href tabanlı) RSC-güvenlidir; onChange kullanan istemci tarafında çalışır.
+// Pager 'use client' dosyasıdır; sunucu sayfalarından serileştirilebilir
+// props'larla (hrefTemplate) güvenle kullanılır (client reference).
+export { Pager, type PagerProps } from './components/pager.js';

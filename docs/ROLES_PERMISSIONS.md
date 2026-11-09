@@ -7,6 +7,8 @@ Roles are templates; tenants can create custom roles only by selecting from a pe
 | Manage tenant/billing | Yes | Limited | No | No | No | No | Billing view | No |
 | Manage users/roles | Yes | Yes | No | No | No | No | No | No |
 | View all customers/assets | Yes | Yes | Yes | Yes | Assigned only | Limited | Yes | Own only |
+| Manage customers/contacts/locations (Phase 04) | Yes | Yes | Yes | Yes | No | No | No | No |
+| Manage asset registry & documents (Phase 04) | Yes | Yes | Yes | Yes | No | No | No | No |
 | Create service request | Yes | Yes | Yes | Yes | Limited | No | No | Own only |
 | Dispatch/assign jobs | Yes | Yes | Yes | Yes | No | No | No | No |
 | View assigned work | Yes | Yes | Yes | Yes | Yes | No | No | Own request only |

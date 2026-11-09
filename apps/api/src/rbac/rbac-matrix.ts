@@ -34,7 +34,7 @@ export const PERMISSION_CATALOGUE: readonly PermissionDefinition[] = [
   { key: 'roles:manage', description: 'Katalogdan özel rol tanımlama', category: 'identity' },
   { key: 'audit:view', description: 'Audit kayıtlarını görüntüler', category: 'identity' },
 
-  // CRM (Faz 04'te kaynak olur)
+  // CRM (Faz 04)
   { key: 'customers:view_all', description: 'Tüm müşteri/varlık kayıtları', category: 'crm' },
   {
     key: 'customers:view_assigned',
@@ -44,6 +44,17 @@ export const PERMISSION_CATALOGUE: readonly PermissionDefinition[] = [
   {
     key: 'customers:view_limited',
     description: 'Sınırlı müşteri/varlık görüntüleme (depo)',
+    category: 'crm',
+  },
+  {
+    key: 'customers:manage',
+    description:
+      'Müşteri, kişi ve servis lokasyonu kayıtlarını oluşturur/günceller/arşivler (Faz 04)',
+    category: 'crm',
+  },
+  {
+    key: 'assets:manage',
+    description: 'Ekipman/varlık kayıtlarını ve dokümanlarını yönetir (Faz 04)',
     category: 'crm',
   },
 
@@ -140,6 +151,8 @@ export const SYSTEM_ROLES: readonly SystemRoleDefinition[] = [
       'roles:manage',
       'audit:view',
       'customers:view_all',
+      'customers:manage',
+      'assets:manage',
       'service_requests:create',
       'work_orders:view_all',
       'work_orders:create',
@@ -163,6 +176,8 @@ export const SYSTEM_ROLES: readonly SystemRoleDefinition[] = [
       'roles:manage',
       'audit:view',
       'customers:view_all',
+      'customers:manage',
+      'assets:manage',
       'service_requests:create',
       'work_orders:view_all',
       'work_orders:create',
@@ -181,6 +196,8 @@ export const SYSTEM_ROLES: readonly SystemRoleDefinition[] = [
     description: 'Servis akışı ve sınırlı stok/teklif yetkisi',
     permissions: [
       'customers:view_all',
+      'customers:manage',
+      'assets:manage',
       'service_requests:create',
       'work_orders:view_all',
       'work_orders:create',
@@ -196,6 +213,8 @@ export const SYSTEM_ROLES: readonly SystemRoleDefinition[] = [
     description: 'Operasyonel yönetim ve tamamlama onayı',
     permissions: [
       'customers:view_all',
+      'customers:manage',
+      'assets:manage',
       'service_requests:create',
       'work_orders:view_all',
       'work_orders:create',

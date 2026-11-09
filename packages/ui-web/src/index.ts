@@ -80,5 +80,9 @@ export {
 // İkonlar
 export { Icon, type IconName, type IconProps } from './icons.js';
 
+// Faz 04: sayfalama + tanım listesi
+export { Pager, type PagerProps } from './components/pager.js';
+export { DetailList, type DetailItem, type DetailListProps } from './components/detail-list.js';
+
 // Kanca
 export { useFocusTrap } from './hooks/use-focus-trap.js';

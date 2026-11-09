@@ -22,12 +22,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { user, membership, permissions } = session;
   const canManageUsers = permissions.includes('users:manage');
   const canManageBranches = permissions.includes('branches:manage');
+  const canViewCrm =
+    permissions.includes('customers:view_all') || permissions.includes('customers:view_limited');
 
   const navSections: NavSection[] = [
     {
       label: 'Çalışma alanı',
       items: [
         { id: 'overview', label: 'Genel Bakış', icon: 'overview' as const, href: '/app/overview' },
+        ...(canViewCrm
+          ? [
+              {
+                id: 'customers',
+                label: 'Müşteriler',
+                icon: 'customers' as const,
+                href: '/app/customers',
+              },
+              {
+                id: 'assets',
+                label: 'Ekipmanlar',
+                icon: 'assets' as const,
+                href: '/app/assets',
+              },
+            ]
+          : []),
       ],
     },
     ...(canManageUsers || canManageBranches
