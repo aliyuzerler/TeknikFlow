@@ -1,0 +1,20 @@
+// TeknikFlow — Faz 01: yalnızca altyapı/meta veri. İş (business) modelleri
+// kendi fazlarında eklenir (bkz. docs/DATA_MODEL.md).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Altyapı önyükleme/üretim meta bilgileri. Tenant verisi DEĞİLDİR.
+model AppSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}

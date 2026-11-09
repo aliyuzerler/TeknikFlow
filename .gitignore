@@ -1,3 +1,4 @@
+# Bağımlılıklar ve derleme çıktıları
 node_modules/
 dist/
 build/
@@ -5,11 +6,30 @@ build/
 out/
 coverage/
 .turbo/
+*.tsbuildinfo
+
+# Ortam / gizli bilgiler
 .env
 .env.local
 .env.*.local
-*.log
-.DS_Store
-expo/.git/
+
+# Yerel altyapı (native mod)
+infra/native/bin/
+infra/native/.data/
+infra/native/.state/
+
+# Test ve rapor çıktıları
+playwright-report/
+test-results/
+
+# Mobil platform çıktıları
+.expo/
 android/
 ios/
+expo/.git/
+
+# IDE / OS
+.DS_Store
+*.log
+.idea/
+.vscode/

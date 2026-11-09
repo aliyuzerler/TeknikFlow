@@ -1,0 +1,16 @@
+{
+  "name": "@teknikflow/infra-native",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Docker'suz yerel altyapı çalıştırıcısı (embedded PostgreSQL + Redis + RustFS) — root/sudo gerektirmez",
+  "scripts": {
+    "start": "node start-local.mjs",
+    "stop": "node stop-local.mjs"
+  },
+  "dependencies": {
+    "embedded-postgres": "^18.6.0-beta.19",
+    "pg": "^8.14.0",
+    "redis-memory-server": "^0.17.1"
+  }
+}

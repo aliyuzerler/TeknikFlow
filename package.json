@@ -1,0 +1,41 @@
+{
+  "name": "teknikflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TeknikFlow — çok kiracılı teknik servis ve saha operasyonları SaaS platformu (monorepo)",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.0.0 <25.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev": "turbo run dev",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "infra:native": "node infra/native/start-local.mjs",
+    "infra:native:stop": "node infra/native/stop-local.mjs",
+    "db:migrate": "dotenv -e .env -o -- prisma migrate deploy --schema apps/api/prisma/schema.prisma",
+    "db:seed": "pnpm --filter @teknikflow/api db:seed",
+    "db:validate": "dotenv -e .env -o -- prisma validate --schema apps/api/prisma/schema.prisma",
+    "db:migrate:dev": "dotenv -e .env -o -- prisma migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema apps/api/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.9.10",
+    "prisma": "^6.19.3",
+    "turbo": "^2.11.10",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}

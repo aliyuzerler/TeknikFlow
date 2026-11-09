@@ -36,13 +36,13 @@ Kritik bağımlılık zinciri: 01 → 02 → 03 → (04/05 paralel olabilir) →
 |---|---|---|---|
 | Node.js | ≥ 20 (önerilen 22/24) | ✅ v24.22.2 | |
 | npm | yalnız pnpm kurulumu için | ✅ 11.19.1 | |
-| pnpm | zorunlu (workspace) | ❌ kurulu değil | `corepack enable` / `npm i -g pnpm` ile kurulabilir — onay bekleniyor |
-| Docker + Compose | Postgres/Redis/MinIO için | ❌ yok (sandbox) | Phase 01'de karar: native servis kurulumu veya alternatif |
+| pnpm | zorunlu (workspace) | ✅ 9.15.9 (`npm i -g pnpm@9`) | Faz 01'de kuruldu |
+| Docker + Compose | Postgres/Redis/obje deposu için | ❌ yok (sandbox) | Faz 01 kararı: `infra/native` (embedded PostgreSQL + Redis + RustFS) — compose dosyaları da hazır (`infra/docker-compose.yml`), CI'da GitHub runner servisleriyle doğrulanır |
 | Git | sürüm kontrol | ✅ 2.47.3 | repo init edildi |
 | Android/iOS build | Mobil fazlar (07+) | ❌ | Expo Go + gerçek cihaz önerilir; iOS build bu ortamda mümkün değil |
-| Turborepo/GH Actions | CI | GitHub Actions dosyaları hazırlanır; sandbox'ta çalıştırılamaz | |
+| Turborepo/GH Actions | CI | ✅ dosyalar hazır (`ci.yml`); sandbox'ta Actions çalıştırılamaz | Kalite + entegrasyon (gerçek servisler) + E2E işleri tanımlı |
 
-**Sandbox kısıtları (dürüst kayıt):** Docker yok → "local dependencies start" kabul kriteri Phase 01'de alternatif yolla (native paketler veya ertelenmiş Docker doğrulaması) karşılanacak ve açıkça raporlanacak. Playwright tarayıcı kurulumu ve mobil cihaz akışları ortam kısıtlarına tabidir; çalıştırılamayan testler asla "geçti" olarak raporlanmaz.
+**Sandbox kısıtları (dürüst kayıt):** Docker yok → "yerel bağımlılıklar başlar" kabul kriteri Faz 01'de `pnpm infra:native` yoluyla **tam karşılandı** (embedded PostgreSQL 18 + Redis + RustFS gerçek süreçler olarak doğrulandı); `docker compose` yolu dosya düzeyinde hazırdır ve GitHub Actions runner'ında doğrulanacaktır. Çalıştırılamayan testler asla "geçti" olarak raporlanmaz.
 
 ## 5. Ürün değişmezleri (her fazda korunur)
 

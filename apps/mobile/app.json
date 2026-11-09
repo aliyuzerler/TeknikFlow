@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "TeknikFlow",
+    "slug": "teknikflow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "teknikflow",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.teknikflow.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.teknikflow.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#132238"
+      }
+    },
+    "platforms": ["ios", "android"],
+    "_comment": "Teknisyen uygulaması Faz 07'de (mobil temel ve gelen kutusu) gerçek akışlarla doldurulur."
+  }
+}

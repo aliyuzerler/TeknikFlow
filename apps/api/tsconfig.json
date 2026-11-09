@@ -1,0 +1,11 @@
+{
+  "extends": "@teknikflow/config/tsconfig.base.json",
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src", "tests", "prisma", "vitest.unit.config.ts", "vitest.integration.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

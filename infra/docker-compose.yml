@@ -1,0 +1,52 @@
+# TeknikFlow yerel altyapısı — Docker Compose (birincil yol).
+# Docker yoksa: `pnpm infra:native` (infra/native) aynı portları root'suz sağlar.
+#
+# NOT: MinIO açık kaynak sunucusu Nisan 2026'da arşivlendi (bkz. docs/decisions/ADR-0005).
+# Yerel S3-uyumlu obje deposu olarak RustFS (Apache-2.0, MinIO drop-in) kullanılır.
+
+name: teknikflow
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: teknikflow
+      POSTGRES_PASSWORD: local_dev_only
+      POSTGRES_DB: teknikflow
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U teknikflow -d teknikflow']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rustfs:
+    image: rustfs/rustfs:1.0.4
+    command: server /data --console-enable --console-address ":9001"
+    environment:
+      RUSTFS_ACCESS_KEY: local_s3_user
+      RUSTFS_SECRET_KEY: local_s3_password_change_me
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # konsol
+    volumes:
+      - s3data:/data
+    # Görüntü healthcheck için curl içermez; bucket hazırlığı
+    # `pnpm db:seed` içindeki yeniden deneme döngüsüyle güvenlidir.
+
+volumes:
+  pgdata:
+  s3data:

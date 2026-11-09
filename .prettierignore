@@ -1,0 +1,14 @@
+node_modules
+dist
+.next
+coverage
+.turbo
+pnpm-lock.yaml
+playwright-report
+test-results
+design
+assets
+infra/native/bin
+infra/native/.data
+infra/native/.state
+*.md

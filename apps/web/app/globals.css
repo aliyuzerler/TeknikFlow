@@ -1,0 +1,295 @@
+/* TeknikFlow — Faz 01 durum sayfası stilleri.
+   Tüm renk/boşluk/yarıçap değerleri @teknikflow/design-tokens token'larından gelir. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--tf-canvas);
+  color: var(--tf-text);
+  font-family: var(--tf-font);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.55;
+}
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--tf-space-8) var(--tf-space-5) var(--tf-space-10);
+}
+
+/* ---- Üstbilim ---- */
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-4);
+  padding-bottom: var(--tf-space-6);
+  border-bottom: 1px solid var(--tf-border);
+  margin-bottom: var(--tf-space-8);
+}
+
+.site-header__mark {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.site-header__titles h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--tf-ink-900);
+  letter-spacing: -0.01em;
+}
+
+.site-header__titles p {
+  margin: 2px 0 0;
+  color: var(--tf-muted);
+  font-size: 0.9rem;
+}
+
+.site-header__phase {
+  margin-left: auto;
+  background: var(--tf-blue-100);
+  color: var(--tf-blue-700);
+  border-radius: var(--tf-radius-sm);
+  padding: var(--tf-space-1) var(--tf-space-3);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- Genel durum bandı ---- */
+.overall {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-3);
+  border-radius: var(--tf-radius-md);
+  padding: var(--tf-space-4) var(--tf-space-5);
+  margin-bottom: var(--tf-space-6);
+  border: 1px solid var(--tf-border);
+  background: var(--tf-surface);
+  box-shadow: var(--tf-shadow-card);
+}
+
+.overall--ok {
+  background: var(--tf-success-bg);
+  border-color: color-mix(in srgb, var(--tf-success) 30%, transparent);
+}
+
+.overall--degraded {
+  background: var(--tf-warning-bg);
+  border-color: color-mix(in srgb, var(--tf-warning) 30%, transparent);
+}
+
+.overall__text {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.overall--ok .overall__text {
+  color: var(--tf-success);
+}
+.overall--degraded .overall__text {
+  color: var(--tf-warning);
+}
+
+.overall__meta {
+  margin-left: auto;
+  color: var(--tf-muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+/* ---- Bölüm başlıkları ---- */
+h2 {
+  font-size: 1.02rem;
+  color: var(--tf-ink-900);
+  margin: var(--tf-space-8) 0 var(--tf-space-3);
+}
+
+/* ---- Servis kartları ---- */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--tf-space-4);
+}
+
+.card {
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  padding: var(--tf-space-4) var(--tf-space-5);
+  box-shadow: var(--tf-shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-2);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+}
+
+.card__name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--tf-ink-900);
+  margin: 0;
+}
+
+.card__desc {
+  margin: 0;
+  color: var(--tf-muted);
+  font-size: 0.84rem;
+}
+
+.card__foot {
+  margin-top: auto;
+  padding-top: var(--tf-space-2);
+  border-top: 1px dashed var(--tf-border);
+  display: flex;
+  gap: var(--tf-space-4);
+  color: var(--tf-muted);
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.badge--ok {
+  background: var(--tf-success-bg);
+  color: var(--tf-success);
+}
+.badge--fail {
+  background: var(--tf-danger-bg);
+  color: var(--tf-danger);
+}
+
+.badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---- Komut bloğu ---- */
+.commands {
+  background: var(--tf-ink-950);
+  color: #dbe7f5;
+  border-radius: var(--tf-radius-md);
+  padding: var(--tf-space-4) var(--tf-space-5);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.7;
+}
+
+.commands .cmt {
+  color: #6c8bb0;
+}
+
+/* ---- Faz tablosu ---- */
+table.phases {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  overflow: hidden;
+  font-size: 0.86rem;
+}
+
+table.phases th,
+table.phases td {
+  text-align: left;
+  padding: var(--tf-space-2) var(--tf-space-4);
+  border-bottom: 1px solid var(--tf-border);
+}
+
+table.phases th {
+  background: var(--tf-canvas);
+  color: var(--tf-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+table.phases tr:last-child td {
+  border-bottom: none;
+}
+
+.phase-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.phase-badge--done {
+  background: var(--tf-success-bg);
+  color: var(--tf-success);
+}
+.phase-badge--in-progress {
+  background: var(--tf-info-bg);
+  color: var(--tf-info);
+}
+.phase-badge--not-started {
+  background: var(--tf-canvas);
+  color: var(--tf-muted);
+}
+
+tr.is-current td {
+  background: color-mix(in srgb, var(--tf-info-bg) 35%, var(--tf-surface));
+}
+
+/* ---- Alt bilgi ---- */
+.site-footer {
+  margin-top: var(--tf-space-10);
+  padding-top: var(--tf-space-4);
+  border-top: 1px solid var(--tf-border);
+  color: var(--tf-muted);
+  font-size: 0.8rem;
+}
+
+.site-footer ul {
+  margin: var(--tf-space-2) 0 0;
+  padding-left: 18px;
+}
+
+/* ---- Mobil ---- */
+@media (max-width: 640px) {
+  .page {
+    padding: var(--tf-space-5) var(--tf-space-4) var(--tf-space-8);
+  }
+  .site-header {
+    flex-wrap: wrap;
+  }
+  .site-header__phase {
+    margin-left: 0;
+  }
+  .overall__meta {
+    margin-left: 0;
+    text-align: left;
+    width: 100%;
+  }
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}

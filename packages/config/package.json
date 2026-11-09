@@ -1,0 +1,9 @@
+{
+  "name": "@teknikflow/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paylaşılan TypeScript temel yapılandırması (strict)",
+  "files": [
+    "tsconfig.base.json"
+  ]
+}

@@ -4,7 +4,7 @@ Update this file at the end of every phase. A phase is not Complete until its te
 
 | Phase | Scope | Status | Test result | Notes |
 |---:|---|---|---|---|
-| 01 | Workspace and infrastructure foundation | Not Started | Not Run | |
+| 01 | Workspace and infrastructure foundation | Complete | PASS — 2026-11-09 | TEST-01 matrisi: `docs/reports/PHASE-01-REPORT.md`. 68 birim + 3 entegrasyon + 5 E2E test geçti; health uçları canlı doğrulandı (curl kanıtları raporda). Docker sandbox'ta yok → native yol (embedded PG + Redis + RustFS) ile karşılandı; compose + CI hazır. |
 | 02 | Brand system, UI shell and Storybook | Not Started | Not Run | |
 | 03 | Identity, tenant isolation, RBAC and onboarding | Not Started | Not Run | |
 | 04 | CRM, contacts, locations and equipment registry | Not Started | Not Run | |

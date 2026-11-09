@@ -4,6 +4,40 @@
 
 > Marka notu: TeknikFlow bu pakette kullanılan çalışma adıdır. Alan adı, sosyal hesap ve TÜRKPATENT marka uygunluğu ayrıca kontrol edilmeden tescilli/boş/özgün olduğu varsayılmamalıdır.
 
+## Geliştirici Kurulumu (Faz 01 itibarıyla — uygulanmış monorepo)
+
+> Faz 01 tamamlandıktan sonra repo kendi başına çalışır durumdadır.
+> Aşağıdaki komutlar gerçek betiklerdir (`package.json`).
+
+Ön koşuller: Node.js 20–24, pnpm 9 (`npm i -g pnpm@9`), Docker (isteğe bağlı —
+yoksa `pnpm infra:native`).
+
+```bash
+pnpm install --frozen-lockfile     # bağımlılıklar (lockfile doğrulanmış)
+
+# Yerel altyapı (PostgreSQL 18 + Redis 7 + RustFS):
+pnpm infra:up                      # A) Docker varsa (docker compose)
+# veya
+pnpm infra:native                  # B) Docker yoksa (root'suz, embedded)
+
+pnpm db:migrate                    # Prisma migration'larını uygula
+pnpm db:seed                       # bucket + app_settings tohumu
+
+pnpm dev                           # API(:4000) + web(:3000) + worker(:4001) + mobil
+
+# Doğrulama:
+pnpm format:check && pnpm lint && pnpm typecheck
+pnpm test                          # birim testler
+pnpm test:integration              # entegrasyon (gerçek DB/Redis/S3 gerektirir)
+pnpm --filter @teknikflow/web test:e2e   # Playwright (Chromium)
+pnpm build                         # üretim derlemesi
+```
+
+Ayrıntılı altyapı notları: `infra/README.md`. Ortam değişkenleri: `.env.example`
+→ `.env` kopyalayın (yerel geliştirme değerleri önceden doludur; üretim değerleri
+değildir). Health uçları: `GET :4000/health/live`, `GET :4000/health/ready`,
+`GET :4001/health` (worker).
+
 ## Paket nasıl kullanılır?
 
 1. ZIP'i yeni bir proje klasörüne çıkartın.

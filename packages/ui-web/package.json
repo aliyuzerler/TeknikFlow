@@ -1,0 +1,28 @@
+{
+  "name": "@teknikflow/ui-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web tasarım sistemi — bileşenler Faz 02'de (marka sistemi, UI shell, Storybook) eklenir",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run -c vitest.config.ts"
+  },
+  "devDependencies": {
+    "@teknikflow/config": "workspace:*",
+    "@types/node": "^24.13.6",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
