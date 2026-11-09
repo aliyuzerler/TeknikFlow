@@ -28,6 +28,12 @@ export const theme = {
   dangerBg: tokens.color.dangerBg,
   info: tokens.color.info,
   infoBg: tokens.color.infoBg,
+  // Faz 03 semantik yardımcıları
+  placeholder: tokens.color.placeholder,
+  separator: tokens.color.separator,
+  subtle: tokens.color.subtle,
+  textStrong: tokens.color.textStrong,
+  onAccent: tokens.color.onAccent,
   // Yarıçap ve boşluk (StyleSheet değerleri)
   radiusSm: tokens.radius.sm,
   radiusMd: tokens.radius.md,

@@ -95,6 +95,16 @@ async function startPostgres() {
     if (!String(error.code).includes('42P04')) throw error;
   });
   log(`Veritabanları hazır: ${PG_DB}, ${PG_TEST_DB}`);
+
+  // Faz 03: düşük ayrıcalıklı uygulama rolü (RLS'in süper kullanıcıda
+  // atlanmaması için). Migration'lar bootstrap sahibiyle koşar (bkz.
+  // package.json db:migrate + MIGRATION_DATABASE_URL).
+  try {
+    await import('./setup-app-role.mjs'); // betik içe aktarımda çalışır
+    log(`Uygulama rolü 'teknikflow_app' hazır (NOSUPERUSER — RLS etkin)`);
+  } catch (error) {
+    log(`Uygulama rolü kurulumu atlandı: ${error instanceof Error ? error.message : error}`);
+  }
   return { kind: 'postgres', stop: () => pg.stop() };
 }
 

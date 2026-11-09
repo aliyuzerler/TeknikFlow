@@ -20,10 +20,11 @@
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "infra:native": "node infra/native/start-local.mjs",
     "infra:native:stop": "node infra/native/stop-local.mjs",
-    "db:migrate": "dotenv -e .env -o -- prisma migrate deploy --schema apps/api/prisma/schema.prisma",
+    "db:setup-role": "dotenv -e .env -o -- node infra/native/setup-app-role.mjs",
+    "db:migrate": "dotenv -e .env -o -- sh -c 'DATABASE_URL=\"$MIGRATION_DATABASE_URL\" prisma migrate deploy --schema apps/api/prisma/schema.prisma' && pnpm db:setup-role",
     "db:seed": "pnpm --filter @teknikflow/api db:seed",
     "db:validate": "dotenv -e .env -o -- prisma validate --schema apps/api/prisma/schema.prisma",
-    "db:migrate:dev": "dotenv -e .env -o -- prisma migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:migrate:dev": "dotenv -e .env -o -- sh -c 'DATABASE_URL=\"$MIGRATION_DATABASE_URL\" prisma migrate dev --schema apps/api/prisma/schema.prisma' && pnpm db:setup-role",
     "db:generate": "prisma generate --schema apps/api/prisma/schema.prisma"
   },
   "devDependencies": {

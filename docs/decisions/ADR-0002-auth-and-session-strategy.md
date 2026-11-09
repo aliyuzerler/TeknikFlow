@@ -1,5 +1,5 @@
 # ADR-0002: Kimlik Doğrulama ve Oturum Stratejisi
-- Status: Proposed
+- Status: Accepted (Phase 03 uygulaması)
 - Date: 2026-11-09
 
 ## Context

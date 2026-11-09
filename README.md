@@ -4,10 +4,12 @@
 
 > Marka notu: TeknikFlow bu pakette kullanılan çalışma adıdır. Alan adı, sosyal hesap ve TÜRKPATENT marka uygunluğu ayrıca kontrol edilmeden tescilli/boş/özgün olduğu varsayılmamalıdır.
 
-## Geliştirici Kurulumu (Faz 01 itibarıyla — uygulanmış monorepo)
+## Geliştirici Kurulumu (Faz 03 itibarıyla — uygulanmış monorepo)
 
-> Faz 01 tamamlandıktan sonra repo kendi başına çalışır durumdadır.
-> Aşağıdaki komutlar gerçek betiklerdir (`package.json`).
+> Faz 01–03 tamamlandı: altyapı, tasarım sistemi + kabuk, kimlik/RBAC/kiracı
+> izolasyonu (RLS dahil). Aşağıdaki komutlar gerçek betiklerdir (`package.json`).
+> Veritabanı erişimi İKİ rollüdür: uygulama `teknikflow_app` (NOSUPERUSER —
+> RLS'e tabi), migration'lar bootstrap sahibiyle (`MIGRATION_DATABASE_URL`).
 
 Ön koşuller: Node.js 20–24, pnpm 9 (`npm i -g pnpm@9`), Docker (isteğe bağlı —
 yoksa `pnpm infra:native`).
@@ -20,10 +22,14 @@ pnpm infra:up                      # A) Docker varsa (docker compose)
 # veya
 pnpm infra:native                  # B) Docker yoksa (root'suz, embedded)
 
-pnpm db:migrate                    # Prisma migration'larını uygula
-pnpm db:seed                       # bucket + app_settings tohumu
+pnpm db:migrate                    # migration'ları uygula + uygulama rolünü kur
+pnpm db:seed                       # bucket + RBAC kataloğu + planlar + demo kiracı
 
 pnpm dev                           # API(:4000) + web(:3000) + worker(:4001) + mobil
+
+# Faz 03 — demo oturum (tohumdan):
+#   e-posta: owner@atlas.example.test   parola: Atlas!2026 (DEMO_SEED_PASSWORD)
+#   http://localhost:3000/login
 
 # Doğrulama:
 pnpm format:check && pnpm lint && pnpm typecheck

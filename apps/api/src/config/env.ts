@@ -21,6 +21,20 @@ const EnvSchema = z.object({
   APP_BASE_URL: z.string().default('http://localhost:3000'),
   APP_VERSION: z.string().default('0.1.0'),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
+  // ---- Faz 03: kimlik doğrulama / oturum ----
+  /** Mobil erişim JWT imza anahtarı (HS256) — üretimde ≥32 rastgele bayt. */
+  AUTH_JWT_SECRET: z.string().min(32, 'en az 32 karakter olmalı'),
+  /** Web opak oturum ömrü (saat). */
+  AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
+  /** Mobil erişim token ömrü (saniye). */
+  AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  /** Mobil dönen refresh token ömrü (gün). */
+  AUTH_REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  /** Davet token ömrü (saat). */
+  AUTH_INVITE_TTL_HOURS: z.coerce.number().int().positive().default(72),
+  /** Rate-limit penceresi (saniye) ve pencere başına azami deneme. */
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(300),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

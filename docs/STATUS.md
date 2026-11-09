@@ -6,7 +6,7 @@ Update this file at the end of every phase. A phase is not Complete until its te
 |---:|---|---|---|---|
 | 01 | Workspace and infrastructure foundation | Complete | PASS — 2026-11-09 | TEST-01 matrisi: `docs/reports/PHASE-01-REPORT.md`. 68 birim + 3 entegrasyon + 5 E2E test geçti; health uçları canlı doğrulandı (curl kanıtları raporda). Docker sandbox'ta yok → native yol (embedded PG + Redis + RustFS) ile karşılandı; compose + CI hazır. |
 | 02 | Brand system, UI shell and Storybook | Complete | PASS — 2026-11-09 | TEST-02 matrisi: `docs/reports/PHASE-02-REPORT.md`. 138 birim + 3 entegrasyon + 34 Storybook etkileşim + 13 E2E test geçti; 77 token (0 rastgele hex), WCAG AA kontrast (8 token revize), 15 ekran görüntüsü `docs/screenshots/phase-02/`. Faz 01 kalıntısı `pnpm dev` API açılış kusuru onarıldı (tsc-watch). |
-| 03 | Identity, tenant isolation, RBAC and onboarding | Not Started | Not Run | |
+| 03 | Identity, tenant isolation, RBAC and onboarding | Complete | PASS — 2026-11-09 | TEST-03 matrisi: `docs/reports/PHASE-03-REPORT.md`. 202 birim + 43 entegrasyon + 41 Storybook + 23 E2E; RLS FORCE (iki-rollü DB erişimi — süper kullanıcı atlaması kapatıldı), IDOR 404 kanıtlı, refresh yeniden-kullanım tespiti, CSRF, plan limitleri, platform admin MFA-fail-closed. 10 ekran görüntüsü `docs/screenshots/phase-03/`. |
 | 04 | CRM, contacts, locations and equipment registry | Not Started | Not Run | |
 | 05 | Service intake and work-order lifecycle | Not Started | Not Run | |
 | 06 | Dispatch board, team capacity and scheduling | Not Started | Not Run | |

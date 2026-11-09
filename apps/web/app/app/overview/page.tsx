@@ -2,7 +2,6 @@
 
 import type { DataTableColumn } from '@teknikflow/ui-web';
 import {
-  AppShell,
   Avatar,
   Button,
   DataTable,
@@ -14,23 +13,20 @@ import {
   StatusBadge,
 } from '@teknikflow/ui-web';
 import {
-  DEMO_CRUMBS,
   DEMO_EYEBROW,
-  DEMO_NAV_SECTIONS,
   DEMO_SLA_ITEMS,
   DEMO_TEAM,
-  DEMO_USER,
   DEMO_WORK_ORDERS,
   type DemoWorkOrder,
 } from '@/src/lib/demo-dashboard';
 
 /**
- * TASARIM ÖNİZLEME SAYFASI — Faz 02 kabul kriteri "responsive web shell works".
+ * GENEL BAKIŞ — Faz 02'deki tasarım önizlemesinin içerik bölümü.
  *
- * Bu sayfa, design/preview.html'i üretim kabuğu (AppShell) ve gerçek
- * bileşenlerle birebir yeniden üretir. Veriler kasıtlı olarak DEMO'dur
- * (src/lib/demo-dashboard.ts — üretim veri yollarında sahte veri yoktur).
- * Kimlik/tenant (Faz 03) gelince gerçek verilerle değiştirilecektir.
+ * Kabuk (kenar çubuğu/üst çubuk) Faz 03'te app/layout.tsx'e taşındı ve
+ * OTURUMDAN türetilir. İçerik verileri kasıtlı olarak DEMO'dur
+ * (src/lib/demo-dashboard.ts — üretim veri yollarında sahte veri yoktur);
+ * iş modelleri (Faz 04+) gerçek API verisiyle değiştirecektir.
  */
 const COLUMNS: Array<DataTableColumn<DemoWorkOrder>> = [
   {
@@ -64,12 +60,7 @@ const COLUMNS: Array<DataTableColumn<DemoWorkOrder>> = [
 
 export default function OverviewDesignPreviewPage() {
   return (
-    <AppShell
-      navSections={[...DEMO_NAV_SECTIONS]}
-      activeId="overview"
-      user={{ ...DEMO_USER }}
-      crumbs={[...DEMO_CRUMBS]}
-    >
+    <>
       <PageHeader
         eyebrow={DEMO_EYEBROW}
         title="Operasyon Genel Bakışı"
@@ -176,6 +167,6 @@ export default function OverviewDesignPreviewPage() {
           </Panel>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

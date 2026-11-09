@@ -86,8 +86,12 @@ jobs:
           RUSTFS_SECRET_KEY: local_s3_password_change_me
 
     env:
-      DATABASE_URL: postgresql://teknikflow:local_dev_only@localhost:5432/teknikflow
-      TEST_DATABASE_URL: postgresql://teknikflow:local_dev_only@localhost:5432/teknikflow
+      # Faz 03: iki rollerli erişim — uygulama NOSUPERUSER (RLS tabi),
+      # migration bootstrap sahibiyle. CI'de gizli değerler olmayan yerel
+      # kimliklerdir; AUTH_JWT_SECRET yalnız test amaçlı sabittir.
+      DATABASE_URL: postgresql://teknikflow_app:local_dev_only@localhost:5432/teknikflow
+      MIGRATION_DATABASE_URL: postgresql://teknikflow:local_dev_only@localhost:5432/teknikflow
+      TEST_DATABASE_URL: postgresql://teknikflow_app:local_dev_only@localhost:5432/teknikflow
       REDIS_URL: redis://localhost:6379
       S3_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1
@@ -95,6 +99,14 @@ jobs:
       S3_ACCESS_KEY: local_s3_user
       S3_SECRET_KEY: local_s3_password_change_me
       API_BASE_URL: http://localhost:4000
+      AUTH_JWT_SECRET: ci_only_secret_value_min_32_characters_padding
+      AUTH_SESSION_TTL_HOURS: 12
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: 900
+      AUTH_REFRESH_TOKEN_TTL_DAYS: 30
+      AUTH_INVITE_TTL_HOURS: 72
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: 300
+      AUTH_RATE_LIMIT_MAX: 10
+      DEMO_SEED_PASSWORD: Atlas!2026
 
     steps:
       - uses: actions/checkout@v4
@@ -114,7 +126,10 @@ jobs:
       - name: Veritabanı migration'ları uygula
         run: pnpm db:migrate
 
-      - name: Tohum (bucket + app_settings)
+      - name: Uygulama rolünü kur (NOSUPERUSER — RLS için)
+        run: pnpm db:setup-role
+
+      - name: Tohum (bucket + RBAC kataloğu + planlar + demo kiracı)
         run: pnpm db:seed
 
       - name: Entegrasyon testleri (health uçları — gerçek DB/Redis/RustFS)
@@ -153,7 +168,7 @@ jobs:
           echo "worker hazır değil; son yanıt:"; curl -s http://localhost:4001/health || true
           exit 1
 
-      - name: Web E2E (Chromium — durum sayfası)
+      - name: Web E2E (Chromium — kimlik akışları, rol sınırı, kabuk, durum sayfası)
         run: pnpm --filter @teknikflow/web test:e2e
 
       - name: Health uçlarını doğrula (curl kanıtı)

@@ -8,7 +8,7 @@ export interface PhaseInfo {
 export const PHASES: readonly PhaseInfo[] = [
   { id: 1, name: 'Çalışma alanı ve altyapı temeli', status: 'done' },
   { id: 2, name: 'Marka sistemi, UI shell ve Storybook', status: 'done' },
-  { id: 3, name: 'Kimlik, kiracı izolasyonu, RBAC ve onboarding', status: 'not-started' },
+  { id: 3, name: 'Kimlik, kiracı izolasyonu, RBAC ve onboarding', status: 'done' },
   { id: 4, name: 'CRM, kişiler, lokasyonlar ve ekipman envanteri', status: 'not-started' },
   { id: 5, name: 'Servis talebi ve iş emri yaşam döngüsü', status: 'not-started' },
   { id: 6, name: 'Dispatch panosu, ekip kapasitesi ve planlama', status: 'not-started' },

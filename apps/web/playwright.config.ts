@@ -6,6 +6,8 @@ export default defineConfig({
   fullyParallel: true,
   retries: 0,
   reporter: [['list']],
+  // Faz 03: kimlik korumalı kabuk — global kurulum owner oturumunu hazırlar.
+  globalSetup: './e2e/auth.setup.ts',
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
@@ -13,8 +15,19 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      // Kimlik akışları: temiz tarayıcı (login/signup/davet kendi oturumunu kurar).
+      name: 'chromium-auth',
+      testMatch: /auth\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      // Korunmuş kabuk + durum sayfası: global owner oturumu storageState ile.
+      name: 'chromium',
+      testIgnore: /auth\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'test-results/.auth/owner-state.json',
+      },
     },
   ],
   webServer: {

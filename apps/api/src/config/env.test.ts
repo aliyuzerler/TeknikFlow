@@ -8,6 +8,7 @@ const validRaw = {
   S3_BUCKET: 'teknikflow-private',
   S3_ACCESS_KEY: 'key',
   S3_SECRET_KEY: 'secret',
+  AUTH_JWT_SECRET: 'x'.repeat(48),
 };
 
 describe('parseEnv', () => {
@@ -31,5 +32,18 @@ describe('parseEnv', () => {
 
   it('bilinmeyen NODE_ENV reddedilir', () => {
     expect(() => parseEnv({ ...validRaw, NODE_ENV: 'staging' })).toThrowError(/NODE_ENV/);
+  });
+
+  it('Faz 03: AUTH_JWT_SECRET zorunlu ve ≥32 karakter', () => {
+    expect(() => parseEnv({ ...validRaw, AUTH_JWT_SECRET: undefined })).toThrowError(
+      /AUTH_JWT_SECRET/,
+    );
+    expect(() => parseEnv({ ...validRaw, AUTH_JWT_SECRET: 'short' })).toThrowError(
+      /AUTH_JWT_SECRET/,
+    );
+    const env = parseEnv(validRaw);
+    expect(env.AUTH_SESSION_TTL_HOURS).toBe(12);
+    expect(env.AUTH_ACCESS_TOKEN_TTL_SECONDS).toBe(900);
+    expect(env.AUTH_INVITE_TTL_HOURS).toBe(72);
   });
 });

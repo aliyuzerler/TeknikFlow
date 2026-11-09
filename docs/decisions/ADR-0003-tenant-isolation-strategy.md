@@ -1,5 +1,5 @@
 # ADR-0003: Tenant İzolasyonu Stratejisi
-- Status: Proposed
+- Status: Accepted (Phase 03 uygulaması)
 - Date: 2026-11-09
 
 ## Context

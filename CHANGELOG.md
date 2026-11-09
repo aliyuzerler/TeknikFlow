@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 — Phase 03: Identity, tenant isolation, RBAC and onboarding
+
+- Kimlik ve oturum (ADR-0002): Argon2id parola, web HttpOnly çerezli oturum + CSRF (çift-gönderim + Origin), mobil kısa ömürlü JWT + dönen refresh aileleri (yeniden kullanım tespiti aile iptali), oturum listeleme/tekil iptal/revoke-all, login-rate-limit (IP + e-posta kovası, PII yazılmaz).
+- Kiracı izolasyonu (ADR-0003): PostgreSQL RLS FORCE — branches/memberships/audit_logs/subscriptions; `TenantScopedPrismaService` transaction-kapsamlı kiracı bağlamı; IDOR reddi 404 (varlık sızıntısı yok); **iki-rollü DB erişimi** (çalışma zamanı `teknikflow_app` NOSUPERUSER; migration bootstrap sahibiyle — süper kullanıcının RLS'i atlaması kapatıldı).
+- RBAC: 27 izinlik katalog + 7 sistem rolü (docs/ROLES_PERMISSIONS.md birebir) tek kaynak modülde; `@RequirePermissions` guard'ları sunucu tarafında; kiracı özel rolleri yalnız katalogdan; sistem rol anahtarları korunur; şube kapsamı rolden AYRI denetlenir; son owner indirgenemez.
+- Onboarding: kiracı signup (varsayılan MERKEZ şubesi + starter deneme aboneliği), davet oluşturma (token yanıtta bir kez) → önizleme → kabul (yeni kullanıcı parola kurar; mevcut kullanıcı e-posta eşleşmeli oturumla), çoklu üyelik seçimi.
+- Plan yetkisi iskeleti: max_users/max_branches sunucu tarafı denetimi (aktif üyelik + açık davet = koltuk).
+- Platform admin ayrımı: üyeliksiz hesap, giriş MFA zorunlu (fail-closed), çapraz-kiracı platform uçları bayrakla sınırlı.
+- Audit: aktör/eylem/kaynak/kiracı/istek + güvenli fark (parola/token/imza REDAKTE; başarısız audit iş mantığını düşürmez).
+- Web: /login, /signup, /invitations/[token], oturum-korumalı app kabuğu (menü yetkiye dayalı), Kullanıcılar & Roller (+davet formu, tek kullanımlık bağlantı), Şubeler; RSC-güvenli `@teknikflow/ui-web/server` girişi; Alert bileşeni (+stories +tests).
+- Testler: 202 birim + 43 entegrasyon (IDOR/RLS ham kanıt/CSRF/rotasyon/limit) + 41 Storybook + 23 E2E; CI iki-rollü erişimle güncellendi.
+- TEST-03 kapısı: PASS (`docs/reports/PHASE-03-REPORT.md`); 10 ekran görüntüsü `docs/screenshots/phase-03/`.
+
 ## 0.2.0 — Phase 02: Brand system, UI shell and Storybook
 
 - Marka sistemi: SVG marka işareti (mavi→teal geçişli "ileri akan T" yolu) + wordmark; 28 ikon; Inter Variable tipografi.

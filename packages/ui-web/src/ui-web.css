@@ -1315,3 +1315,85 @@
 .tf-logo--light .tf-logo__text strong {
   color: var(--tf-on-accent);
 }
+
+/* ---------- Satır içi bildirim (Alert) ---------- */
+.tf-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tf-space-3);
+  padding: var(--tf-space-3) var(--tf-space-4);
+  border-radius: var(--tf-radius-md);
+  border: 1px solid var(--tf-border);
+  font-size: var(--tf-text-sm);
+}
+
+.tf-alert__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--tf-radius-sm);
+  margin-top: 1px;
+}
+
+.tf-alert__title {
+  display: block;
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.tf-alert__content {
+  margin-top: 2px;
+  color: var(--tf-text);
+  line-height: 1.5;
+}
+
+.tf-alert--info {
+  background: var(--tf-info-bg);
+  border-color: color-mix(in srgb, var(--tf-info) 30%, transparent);
+}
+.tf-alert--info .tf-alert__icon {
+  background: color-mix(in srgb, var(--tf-info) 12%, transparent);
+  color: var(--tf-info);
+}
+.tf-alert--info .tf-alert__title {
+  color: var(--tf-info);
+}
+
+.tf-alert--success {
+  background: var(--tf-success-bg);
+  border-color: color-mix(in srgb, var(--tf-success) 30%, transparent);
+}
+.tf-alert--success .tf-alert__icon {
+  background: color-mix(in srgb, var(--tf-success) 12%, transparent);
+  color: var(--tf-success);
+}
+.tf-alert--success .tf-alert__title {
+  color: var(--tf-success);
+}
+
+.tf-alert--warning {
+  background: var(--tf-warning-bg);
+  border-color: color-mix(in srgb, var(--tf-warning) 35%, transparent);
+}
+.tf-alert--warning .tf-alert__icon {
+  background: color-mix(in srgb, var(--tf-warning) 14%, transparent);
+  color: var(--tf-warning-strong);
+}
+.tf-alert--warning .tf-alert__title {
+  color: var(--tf-warning-strong);
+}
+
+.tf-alert--danger {
+  background: var(--tf-danger-bg);
+  border-color: color-mix(in srgb, var(--tf-danger) 30%, transparent);
+}
+.tf-alert--danger .tf-alert__icon {
+  background: color-mix(in srgb, var(--tf-danger) 12%, transparent);
+  color: var(--tf-danger);
+}
+.tf-alert--danger .tf-alert__title {
+  color: var(--tf-danger);
+}

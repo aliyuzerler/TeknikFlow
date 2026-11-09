@@ -1,5 +1,6 @@
-// TeknikFlow — Faz 01: yalnızca altyapı/meta veri. İş (business) modelleri
-// kendi fazlarında eklenir (bkz. docs/DATA_MODEL.md).
+// TeknikFlow — Faz 03: kimlik, kiracı izolasyonu, RBAC ve onboarding.
+// (Faz 01'nin altyapı meta verisi korunur; iş modelleri kendi fazlarında eklenir.)
+// BKZ. docs/DATA_MODEL.md, docs/ROLES_PERMISSIONS.md, ADR-0002, ADR-0003.
 generator client {
   provider = "prisma-client-js"
 }
@@ -17,4 +18,317 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 
   @@map("app_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Kimlik
+// ---------------------------------------------------------------------------
+
+/// Kullanıcı hesabı — kiracılardan bağımsız tekil kimlik (e-posta tekil).
+/// platformAdmin: kiracı üyeliği OLMADAN platform düzeyinde erişen hesaplar.
+model User {
+  id              String       @id @default(uuid())
+  emailNormalized String       @unique
+  /// Argon2id özetı — asla loglanmaz/yanıtta dönmaz.
+  passwordHash    String
+  displayName     String
+  status          UserStatus   @default(ACTIVE)
+  /// MFA-hazır model: şema destekler; platform admin için giriş anında zorunlu.
+  mfaEnabled      Boolean      @default(false)
+  platformAdmin   Boolean      @default(false)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  memberships Membership[]
+  sessions    Session[]
+  refreshTokens RefreshTokenFamily[]
+  invitesSent Invitation[] @relation("InvitationInviter")
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+  @@map("user_status")
+}
+
+/// Kiracı (müşteri firma). slug URL'lerde kullanılan benzersiz kısa ad.
+model Tenant {
+  id           String       @id @default(uuid())
+  name         String
+  slug         String       @unique
+  status       TenantStatus @default(ACTIVE)
+  timezone     String       @default("Europe/Istanbul")
+  locale       String       @default("tr-TR")
+  currency     String       @default("TRY")
+  settingsJson Json         @default("{}")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  memberships  Membership[]
+  branches     Branch[]
+  invitations  Invitation[]
+  auditLogs    AuditLog[]
+  subscription Subscription?
+  roles        Role[]
+
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  @@map("tenant_status")
+}
+
+/// Kiracı şube (fiziksel lokasyon). RLS ile korunur (bkz. migration).
+model Branch {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  /// Kiracı içinde benzersiz kısa kod (ör. IST-MRKZ).
+  code      String
+  address   String?
+  timezone  String   @default("Europe/Istanbul")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("branches")
+}
+
+/// Rol şablonu. Sistem rolleri kiracıdan bağımsız (tenantId=null, isSystem);
+/// kiracılar yalnızca izin kataloğundan seçerek özel rol üretebilir.
+model Role {
+  id          String  @id @default(uuid())
+  /// Sistem roller için benzersiz anahtar (owner, admin...).
+  key         String
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+  tenantId    String?
+  tenant      Tenant? @relation(fields: [tenantId], references: [id])
+
+  memberships    Membership[]
+  invitations    Invitation[]  @relation("InvitationRole")
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+/// İzin kataloğu — sunucu tarafında tanımlı, kiracılar genişletemez.
+model Permission {
+  key         String @id
+  description String
+  category    String
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId        String
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionKey String
+  permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+/// Kiracı üyeliği — kullanıcı ↔ kiracı ↔ rol ↔ şube kapsamı.
+/// RLS ile korunur; kiracı bağlamı DAİMA bu kayıttan türetilir (ADR-0003).
+model Membership {
+  id          String           @id @default(uuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  roleId      String
+  role        Role             @relation(fields: [roleId], references: [id])
+  /// "ALL" ya da ["<branchId>", ...] — şube kapsamı rolden AYRI denetlenir.
+  branchScope Json             @default("\"ALL\"")
+  status      MembershipStatus @default(INVITED)
+  invitedAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  sessions           Session[]
+  refreshTokenFamilies RefreshTokenFamily[]
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@index([tenantId, status])
+  @@map("memberships")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  @@map("membership_status")
+}
+
+/// Web opak oturumu (ADR-0002). tokenHash = sha256(cookie değeri).
+/// csrfTokenHash web oturumlarına bağlı CSRF bağlaması.
+model Session {
+  id            String       @id @default(uuid())
+  tokenHash     String       @unique
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  /// null → platform admin oturumu (kiracı bağlamı yok).
+  membershipId  String?
+  membership    Membership?  @relation(fields: [membershipId], references: [id])
+  kind          SessionKind  @default(WEB)
+  csrfTokenHash String?
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+  lastUsedAt    DateTime     @default(now())
+  createdIp     String?
+  userAgent     String?
+  createdAt     DateTime     @default(now())
+
+  @@index([userId, revokedAt])
+  @@map("sessions")
+}
+
+enum SessionKind {
+  WEB
+  MOBILE
+  @@map("session_kind")
+}
+
+/// Mobil dönen refresh token aileleri (ADR-0002): yeniden kullanım tespiti
+/// aile iptali ile sonuçlanır. rotatedAt set = başka bir token'a dönüldü.
+model RefreshTokenFamily {
+  id              String    @id @default(uuid())
+  familyId        String    @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  membershipId    String
+  membership      Membership @relation(fields: [membershipId], references: [id])
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  rotatedAt       DateTime?
+  reuseDetectedAt DateTime?
+  revokedAt       DateTime?
+  revokedReason   String?
+  createdIp       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+  @@map("refresh_token_families")
+}
+
+/// Kiracı daveti. tokenHash = sha256(opak token) — token yalnız oluşturulduğunda
+/// bir kez API yanıtında döner. E-posta gönderimi Faz 12'de; MVP'de bağlantı yanıtta.
+model Invitation {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  emailNormalized  String
+  roleId           String
+  role             Role      @relation("InvitationRole", fields: [roleId], references: [id])
+  branchScope      Json      @default("\"ALL\"")
+  tokenHash        String    @unique
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  invitedByUserId  String
+  invitedBy        User      @relation("InvitationInviter", fields: [invitedByUserId], references: [id])
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, emailNormalized])
+  @@index([tenantId, expiresAt])
+  @@map("invitations")
+}
+
+/// Audit kaydı — aktör, eylem, kaynak, kiracı, zaman, istek kimliği ve GÜVENLİ
+/// fark (parola/token/imza asla metadata'ya girmez). RLS ile korunur.
+model AuditLog {
+  id            String   @id @default(uuid())
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id])
+  actorId       String?
+  actorType     String   @default("user")
+  action        String
+  resourceType  String
+  resourceId    String?
+  requestId     String?
+  ip            String?
+  userAgent     String?
+  metadataJson  Json     @default("{}")
+  occurredAt    DateTime @default(now())
+
+  @@index([tenantId, occurredAt])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Plan / yetki iskeleti (Faz 14 billing sağlar; şimdilik sunucu tarafı kontroller)
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  description String?
+  isActive    Boolean          @default(true)
+  entitlements PlanEntitlement[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// plan yetkisi: key (ör. max_users) → limitValue (null = sınırsız) / enabled.
+model PlanEntitlement {
+  planId     String
+  plan       Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  key        String
+  limitValue Int?
+  enabled    Boolean @default(true)
+
+  @@id([planId, key])
+  @@map("plan_entitlements")
+}
+
+/// Kiracı aboneliği iskeleti — durum makinesi Faz 14'te webhook'larla işletilir.
+model Subscription {
+  id               String             @id @default(uuid())
+  tenantId         String             @unique
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  planId           String
+  plan             Plan               @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus @default(TRIALING)
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  GRACE_PERIOD
+  SUSPENDED
+  CANCELED
+  INCOMPLETE
+  @@map("subscription_status")
 }

@@ -62,8 +62,12 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
     const body = exception.getResponse();
     const message = extractMessage(body);
     const fieldErrors = extractFieldErrors(body);
+    // Faz 03: istisna gövdesinde kod taşınıyorsa (INVALID_CREDENTIALS,
+    // CSRF_INVALID, PLAN_LIMIT_EXCEEDED...) duruma göre türetilmiş genel kod
+    // yerine o kod kullanılır — istemciler ayrım yapabilir.
+    const code = extractCode(body) ?? codeForStatus(statusCode);
     return {
-      code: codeForStatus(statusCode),
+      code,
       message,
       requestId,
       statusCode,
@@ -93,6 +97,17 @@ function extractMessage(body: string | object): string {
     }
   }
   return 'İstek reddedildi';
+}
+
+/** İstisna gövdesindeki açık kod (varsa) — genel kod yerine geçer. */
+function extractCode(body: string | object): string | undefined {
+  if (typeof body === 'object' && 'code' in body) {
+    const code = (body as { code?: unknown }).code;
+    if (typeof code === 'string' && /^[A-Z][A-Z0-9_]{2,60}$/.test(code)) {
+      return code;
+    }
+  }
+  return undefined;
 }
 
 function extractFieldErrors(
