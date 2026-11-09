@@ -1578,3 +1578,106 @@
   color: var(--tf-muted);
   margin: 0;
 }
+
+/* Faz 06 — MeterBar (kapasite/yük göstergesi) */
+
+.tf-meter {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  min-width: 0;
+}
+
+.tf-meter--sm .tf-meter__track {
+  height: 6px;
+}
+
+.tf-meter__track {
+  flex: 1;
+  min-width: 80px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tf-muted-bg, #eef1f5);
+  border: 1px solid var(--tf-border);
+  overflow: hidden;
+}
+
+.tf-meter__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 160ms ease;
+}
+
+.tf-meter__fill--ok {
+  background: var(--tf-success);
+}
+
+.tf-meter__fill--info {
+  background: var(--tf-info);
+}
+
+.tf-meter__fill--warning {
+  background: var(--tf-warning);
+}
+
+.tf-meter__fill--danger {
+  background: var(--tf-danger);
+}
+
+.tf-meter__text {
+  flex: none;
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+  white-space: nowrap;
+}
+
+/* Faz 06 — SegmentedControl (görünüm seçici) */
+
+.tf-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--tf-radius-sm, 8px);
+  border: 1px solid var(--tf-border);
+  background: var(--tf-surface);
+}
+
+.tf-segmented[data-disabled='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tf-segmented__option {
+  display: inline-flex;
+}
+
+.tf-segmented__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: var(--tf-text-sm);
+  font-weight: 500;
+  color: var(--tf-muted);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.tf-segmented__label:hover {
+  color: var(--tf-text);
+}
+
+.tf-segmented__label--active {
+  background: var(--tf-primary);
+  color: var(--tf-on-primary, #fff);
+}
+
+.tf-segmented__option:focus-within .tf-segmented__label {
+  outline: 2px solid var(--tf-focus, #4c9ffe);
+  outline-offset: 1px;
+}

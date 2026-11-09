@@ -11,6 +11,7 @@ import { EntitlementsModule } from './entitlements/entitlements.module.js';
 import { PlatformModule } from './platform/platform.module.js';
 import { CrmModule } from './crm/crm.module.js';
 import { ServiceModule } from './service/service.module.js';
+import { DispatchModule } from './dispatch/dispatch.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ServiceModule } from './service/service.module.js';
     PlatformModule,
     CrmModule,
     ServiceModule,
+    DispatchModule,
     HealthModule,
   ],
 })

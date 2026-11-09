@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0 — Phase 06: Dispatch board, team capacity and scheduling
+
+- Sevk motoru (ADR-0008): çakışma/kapasite/SLA/yetenek/serbest-slot kurallarının TEK gerçekliği veritabanı erişimi olmayan saf modülde (`dispatch-engine.ts` — 36 birim test); schedule ucu, doğrudan ASSIGNED geçişi ve PATCH schedule üç mutasyon yüzeyi de aynı motorü çağırır.
+- Çift rezervasyon yok: örtüşen planlama 409 SCHEDULE_CONFLICT + OVERLAP bulgusu; uçtan-uca bitişik işler serbest; izin çakışması (TIME_OFF) 409 → izin iptal edilince planlanır; çalışma saati şablonu VARSA dışarı taşma (OUTSIDE_WORKING_HOURS, kalan dakika raporlu) 409 — şablon yoksa kısıt yok ("veri yok = kısıt yok").
+- Çakışma üzerine planlama: `work_orders:dispatch_override` izni (yalnız owner/admin) + ≥10 karakter gerekçe; planlamacı 403 OVERRIDE_FORBIDDEN, kısa gerekçe şema 400; gerekçe `scheduleOverrideReason`'a kalıcı yazılır ve olay/audit akışına girer; bulgular hata zarfında `conflicts[]` ile (yalnız kendi kiracısının iş emri kimlikleri).
+- Saat dilimi çekirdeği: depolama UTC, kiracı yerel duvar saati yalnız yorumda; iki geçişli ofset düzeltmesi — DST ileri/geri alması ve 23/25 saatlik günler doğru (Berlin 2026 testleri); Europe/Istanbul kalıcı UTC+3; çalışma saatleri ISO hafta içi + dakika aralığı şablonu.
+- Kapasite ve müsaitlik: günlük kapasite = min(şablon, üst sınır); planlı dakikalar gün sınırlarıyla kesişim; kullanım % (`MeterBar`); serbest slotlar = çalışma − planlı − izin (`/dispatch/technicians/:id/availability`); gün çakışma listesi ucu.
+- Tek adımda planla/ata: DRAFT→PLANNED(+ASSIGNED) tek uçtan; ASSIGNED iş başka teknisyene devredilir (atama geçmişi korunur); yetenek gereksinimi eksik teknisyende BLOK değil — `skillWarnings` + kuyrukta `requiredSkillKeys` görünürlüğü.
+- Yetenek altyapısı: kiracı yetenek kataloğu + teknisyen seviyeleri + kategori gereksinimleri (`service_category_skills`); takımlar (kod tekil, takım lideri, üye ekleme/çıkarma — planlamacı takım kuramaz).
+- SLA iş emrine taşındı: `work_orders.slaDueAt` migration'la geri dolduruldu — talepten dönüşen devralır (müşteri sözü sıfırlanmaz), doğrudan açılan öncelik varsayılanından; pano aşım/risk rozetleri (4 saat eşiği).
+- Web pano `/app/dispatch`: kanban (teknisyen kolonları + planlama kuyruğu, HTML5 sürükle-bırak + tam klavye alternatifi), takvim (hafta matrisi), liste; SLA rozetleri; çakışma uyarısı paneli; kiracı saat dilimi dönüşüm kütüphanesi (testli).
+- ui-web: SegmentedControl (klavye seçimli) + MeterBar bileşenleri + stories + etkileşim testleri; api-client: dispatch typed istemcisi.
+- RBAC: `work_orders:dispatch_override` (owner/admin); teknisyen pano/teknisyen listesi/planlama 403; 8 yeni tablo RLS FORCE (pg_class 8/8 kanıtı; çapraz-kiracı yazma 404 + ham satır-0 kanıtı).
+- Faz 03 kalıntısı düzeltildi: oturum çerezi maxAge saniye→milisaniye (12 saatlik oturum ~43 saniyede biterdi). Faz 05 kalıntısı: aktif gezinme öğesi yol adından türetilir.
+- Testler: 344 birim (+64) + 135 entegrasyon (+26: dispatch) + 67 Storybook (+12) + 38 E2E (+4: pano atama klavyeyle/çakışma/rol/mobil).
+- TEST-06 kapısı: PASS (`docs/reports/PHASE-06-REPORT.md`); 4 ekran görüntüsü `docs/screenshots/phase-06/`.
+
 ## 0.5.0 — Phase 05: Service intake and work-order lifecycle
 
 - Servis talebi (intake) gelen kutusu: oluşturma (portal/ofis/e-posta/API kaynakları), arama/durum/öncelik filtreleri + sayfalama, SLA hedefi ve görünür aşım bayrağı; kategori kataloğu (kiracıya özel, çift anahtar 409) ve öncelik bazlı SLA politikaları (varsayılan katalog: Acil 4sa → Düşük 72sa; triyajda öncelik değişimi SLA'yı createdAt referansıyla yeniden hesaplar).

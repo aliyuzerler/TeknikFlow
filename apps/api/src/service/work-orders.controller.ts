@@ -102,6 +102,7 @@ export class WorkOrdersController {
     const updated = await this.workOrders.updateWorkOrder(requireTenant(ctx), id, input, {
       userId: ctx.userId,
       requestId: headerString(req),
+      permissions: ctx.permissions,
     });
     return WorkOrdersService.toView(updated);
   }

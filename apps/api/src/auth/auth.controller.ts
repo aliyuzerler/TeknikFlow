@@ -382,7 +382,10 @@ function toMembershipView(m: {
 
 function setSessionCookies(res: Response, token: string, csrfToken: string, expiresAt: Date): void {
   const env = getEnv();
-  const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+  // Express res.cookie maxAge'i MİLİSANİYE cinsinden alır (Faz 06 düzeltmesi:
+  // önceden saniye hesaplanıyordu → 12 saatlik oturum çerezi 43 saniyede
+  // süresi doluyordu; uzun E2E akışları bunu ortaya çıkardı).
+  const maxAge = Math.max(0, expiresAt.getTime() - Date.now());
   const base = {
     sameSite: 'lax' as const,
     secure: env.NODE_ENV === 'production',

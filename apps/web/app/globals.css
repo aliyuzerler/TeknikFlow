@@ -441,3 +441,478 @@ tr.is-current td {
   border-color: var(--tf-blue-600);
   box-shadow: var(--tf-focus-ring);
 }
+
+/* ---- Faz 06: dispatch panosu ---- */
+
+.tf-dispatch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-4);
+}
+
+.tf-dispatch__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tf-space-3);
+}
+
+.tf-dispatch__datenav {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+}
+
+.tf-dispatch__date {
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+  min-width: 160px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.tf-dispatch__sla,
+.tf-dispatch__conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-2);
+}
+
+.tf-dispatch__conflictlist {
+  list-style: none;
+  margin: 0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+}
+
+.tf-dispatch__conflictlist li {
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  font-size: var(--tf-text-sm);
+  color: var(--tf-text);
+  flex-wrap: wrap;
+}
+
+/* Kanban */
+.tf-dispatch__kanban {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 300px);
+  gap: var(--tf-space-3);
+  overflow-x: auto;
+  padding-bottom: var(--tf-space-2);
+}
+
+.tf-dispatch__col {
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+  background: var(--tf-muted-bg, #f6f8fa);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+}
+
+.tf-dispatch__col--queue {
+  background: var(--tf-surface);
+}
+
+.tf-dispatch__colhead {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--tf-border);
+}
+
+.tf-dispatch__coltitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+  flex-wrap: wrap;
+}
+
+.tf-dispatch__colteam {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+}
+
+.tf-dispatch__colcount {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+}
+
+.tf-dispatch__colbody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  flex: 1;
+}
+
+.tf-dispatch__colbody > .tf-panel__subtitle {
+  margin: 0;
+}
+
+/* Sürükle hedefi görsel geri bildirimi */
+.tf-dispatch__col:has(.tf-dispatch__colbody:hover) {
+  border-color: var(--tf-blue-600);
+}
+
+.tf-dispatch__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.tf-dispatch__card[draggable='true'] {
+  cursor: grab;
+}
+
+.tf-dispatch__card:focus-visible {
+  outline: 2px solid var(--tf-focus, #4c9ffe);
+  outline-offset: 2px;
+}
+
+.tf-dispatch__cardhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tf-dispatch__cardsubject {
+  margin: 0;
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+  overflow-wrap: anywhere;
+}
+
+.tf-dispatch__cardmeta {
+  margin: 0;
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+}
+
+.tf-dispatch__cardfoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tf-dispatch__cardaction {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  color: var(--tf-blue-700, #1d4ed8);
+  cursor: pointer;
+}
+
+.tf-dispatch__cardaction:hover {
+  background: var(--tf-blue-50, #eff6ff);
+}
+
+.tf-dispatch__cardaction:focus-visible {
+  outline: 2px solid var(--tf-focus, #4c9ffe);
+  outline-offset: 1px;
+}
+
+/* Takvim (hafta matrisi) */
+.tf-dispatch__calendar {
+  overflow-x: auto;
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  background: var(--tf-surface);
+}
+
+.tf-dispatch__calhead,
+.tf-dispatch__calrow {
+  display: grid;
+  grid-template-columns: 140px repeat(7, minmax(96px, 1fr));
+}
+
+.tf-dispatch__calhead {
+  border-bottom: 2px solid var(--tf-border);
+  background: var(--tf-muted-bg, #f6f8fa);
+  position: sticky;
+  top: 0;
+}
+
+.tf-dispatch__calday {
+  padding: 8px 10px;
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  color: var(--tf-muted);
+  text-align: center;
+}
+
+.tf-dispatch__calday--today {
+  color: var(--tf-text);
+  background: var(--tf-blue-50, #eff6ff);
+}
+
+.tf-dispatch__calfirst,
+.tf-dispatch__caltech {
+  padding: 10px;
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+  border-right: 1px solid var(--tf-border);
+  overflow-wrap: anywhere;
+}
+
+.tf-dispatch__calrow {
+  border-bottom: 1px solid var(--tf-border);
+}
+
+.tf-dispatch__calrow:last-child {
+  border-bottom: none;
+}
+
+.tf-dispatch__calcell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  min-height: 64px;
+  border-right: 1px solid var(--tf-border);
+}
+
+.tf-dispatch__calchip {
+  border: 1px solid var(--tf-border);
+  border-radius: 6px;
+  background: var(--tf-muted-bg, #f6f8fa);
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--tf-text-xs);
+  color: var(--tf-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tf-dispatch__calchip--urgent {
+  border-color: var(--tf-danger);
+  background: var(--tf-red-50, #fef2f2);
+}
+
+.tf-dispatch__calchip--high {
+  border-color: var(--tf-warning);
+}
+
+.tf-dispatch__calchip:focus-visible {
+  outline: 2px solid var(--tf-focus, #4c9ffe);
+  outline-offset: 1px;
+}
+
+/* Liste görünümü */
+.tf-dispatch__list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+  background: var(--tf-surface);
+  overflow-x: auto;
+}
+
+.tf-dispatch__listrow {
+  display: grid;
+  grid-template-columns: 110px minmax(200px, 2fr) minmax(140px, 1fr) 110px 140px 170px;
+  gap: var(--tf-space-2);
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--tf-border);
+  font-size: var(--tf-text-sm);
+}
+
+.tf-dispatch__listrow:last-child {
+  border-bottom: none;
+}
+
+.tf-dispatch__listrow--head {
+  background: var(--tf-muted-bg, #f6f8fa);
+  font-size: var(--tf-text-xs);
+  font-weight: 600;
+  color: var(--tf-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tf-dispatch__listsubject {
+  min-width: 0;
+}
+
+/* Takım kapasitesi */
+.tf-dispatch__teamgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--tf-space-3);
+}
+
+.tf-dispatch__teamcard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--tf-surface);
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-md);
+}
+
+.tf-dispatch__teamname {
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+}
+
+/* Planlama paneli formu */
+.tf-dispatch__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-3);
+}
+
+.tf-dispatch__formsummary {
+  margin: 0;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-text);
+  line-height: 1.5;
+}
+
+.tf-dispatch__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--tf-text-sm);
+}
+
+.tf-dispatch__field > span {
+  font-weight: 600;
+  color: var(--tf-text);
+}
+
+.tf-dispatch__field input,
+.tf-dispatch__field select,
+.tf-dispatch__field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  background: var(--tf-surface);
+  color: var(--tf-text);
+  font: inherit;
+  font-size: var(--tf-text-sm);
+}
+
+.tf-dispatch__field input:focus-visible,
+.tf-dispatch__field select:focus-visible,
+.tf-dispatch__field textarea:focus-visible {
+  outline: none;
+  border-color: var(--tf-blue-600);
+  box-shadow: var(--tf-focus-ring);
+}
+
+.tf-dispatch__fieldrow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--tf-space-3);
+}
+
+.tf-dispatch__skillmatch {
+  margin: 0;
+  font-size: var(--tf-text-sm);
+  color: var(--tf-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tf-dispatch__conflictbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-2);
+  padding: 14px;
+  border: 1px solid var(--tf-warning);
+  border-radius: var(--tf-radius-sm);
+  background: var(--tf-amber-50, #fffbeb);
+}
+
+.tf-dispatch__conflictbox h4 {
+  margin: 0;
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  color: var(--tf-text);
+}
+
+.tf-dispatch__conflictbox ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--tf-text-sm);
+}
+
+.tf-dispatch__conflictbox li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tf-dispatch__formactions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tf-space-2);
+  padding-top: var(--tf-space-2);
+  border-top: 1px solid var(--tf-border);
+}
+
+/* Mobil: kanban kolonları ve liste dikey akar */
+@media (max-width: 720px) {
+  .tf-dispatch__kanban {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+  }
+
+  .tf-dispatch__calhead,
+  .tf-dispatch__calrow {
+    grid-template-columns: 90px repeat(7, minmax(72px, 1fr));
+  }
+
+  .tf-dispatch__listrow {
+    grid-template-columns: 100px minmax(140px, 2fr) 100px 120px;
+  }
+
+  .tf-dispatch__listrow > *:nth-child(5),
+  .tf-dispatch__listrow > *:nth-child(6) {
+    grid-column: 1 / -1;
+  }
+
+  .tf-dispatch__fieldrow {
+    grid-template-columns: 1fr;
+  }
+}

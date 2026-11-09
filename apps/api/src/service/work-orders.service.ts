@@ -26,6 +26,9 @@ import { normalizeName } from '../crm/crm-utils.js';
 import type { ScopedClient } from '../common/tenant-scoped-prisma.js';
 import type { TransitionAuthority } from './work-order-state.js';
 import { requireTransitionRule, transitionEffects } from './work-order-state.js';
+import { ScheduleConflictService } from './schedule-conflict.service.js';
+import { computeSlaDueAt, defaultResolveMinutes } from './sla.js';
+import { slaState } from './dispatch-engine.js';
 
 /**
  * Faz 05 — iş emri servisi: yaşam döngüsü, atama, notlar, zaman çizelgesi.
@@ -97,6 +100,7 @@ export class WorkOrdersService {
   constructor(
     private readonly scoped: TenantScopedPrismaService,
     private readonly audit: AuditService,
+    private readonly scheduleConflicts: ScheduleConflictService,
   ) {}
 
   // ------------------------- Liste / görünürlük -------------------------
@@ -243,11 +247,16 @@ export class WorkOrdersService {
       }
 
       // Talepten dönüşüm: talep açık olmalı ve birebir iş emri üretmeli.
-      let request: { id: string; status: string; createdAt: Date } | null = null;
+      let request: {
+        id: string;
+        status: string;
+        createdAt: Date;
+        slaDueAt: Date | null;
+      } | null = null;
       if (input.requestId) {
         request = await tx.serviceRequest.findFirst({
           where: { id: input.requestId, tenantId },
-          select: { id: true, status: true, createdAt: true },
+          select: { id: true, status: true, createdAt: true, slaDueAt: true },
         });
         if (!request) throw notFound('Servis talebi bulunamadı');
         if (request.status !== 'NEW' && request.status !== 'IN_REVIEW') {
@@ -259,6 +268,16 @@ export class WorkOrdersService {
       }
 
       const now = new Date();
+      // Faz 06 — SLA: talepten dönüşümde müşteri sözü DEVRALINIR;
+      // doğrudan açılışta öncelik politikasından hesaplanır.
+      const slaPolicy = await tx.slaPolicy.findUnique({
+        where: { tenantId_priority: { tenantId, priority: input.priority } },
+        select: { resolveMinutes: true },
+      });
+      const slaDueAt = request
+        ? request.slaDueAt
+        : computeSlaDueAt(now, slaPolicy?.resolveMinutes ?? defaultResolveMinutes(input.priority));
+
       const workOrderNo = await this.nextWorkOrderNo(tx, tenantId, now);
       const planned =
         input.scheduledStart && input.scheduledEnd ? ('PLANNED' as const) : ('DRAFT' as const);
@@ -279,6 +298,7 @@ export class WorkOrdersService {
           ...(input.description ? { description: input.description } : {}),
           ...(input.scheduledStart ? { scheduledStart: new Date(input.scheduledStart) } : {}),
           ...(input.scheduledEnd ? { scheduledEnd: new Date(input.scheduledEnd) } : {}),
+          slaDueAt,
           createdById: actor.userId,
           version: 0,
         },
@@ -359,12 +379,19 @@ export class WorkOrdersService {
     tenantId: string,
     workOrderId: string,
     input: UpdateWorkOrderRequest,
-    actor: { userId: string; requestId?: string },
+    actor: { userId: string; requestId?: string; permissions: Set<string> },
   ): Promise<WorkOrderRow> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const current = await tx.workOrder.findFirst({
         where: { id: workOrderId, tenantId },
-        select: { id: true, version: true, status: true },
+        select: {
+          id: true,
+          version: true,
+          status: true,
+          assignedToId: true,
+          scheduledStart: true,
+          scheduledEnd: true,
+        },
       });
       if (!current) throw notFound();
       if (current.version !== input.expectedVersion) {
@@ -431,6 +458,49 @@ export class WorkOrdersService {
           message: 'Bitiş zamanı başlangıçtan sonra olmalı',
           code: 'SCHEDULE_INVALID',
         });
+      }
+
+      // Faz 06 — atanmış iş emrinin pencere değişimi çakışma denetiminden
+      // geçer (çift rezervasyon engelinin ikinci gerçeklik noktası).
+      const scheduleChanged =
+        input.scheduledStart !== undefined || input.scheduledEnd !== undefined;
+      const effectiveStart = newStart ?? current.scheduledStart;
+      const effectiveEnd = newEnd ?? current.scheduledEnd;
+      if (
+        scheduleChanged &&
+        current.assignedToId &&
+        effectiveStart &&
+        effectiveEnd &&
+        effectiveEnd > effectiveStart
+      ) {
+        const evaluation = await this.scheduleConflicts.assertNoConflicts(
+          tx,
+          tenantId,
+          {
+            assigneeUserId: current.assignedToId,
+            window: { start: effectiveStart, end: effectiveEnd },
+            excludeWorkOrderId: current.id,
+          },
+          { requested: input.overrideConflict === true, reason: input.overrideReason },
+          actor.permissions,
+        );
+        if (evaluation.overridden) {
+          data.scheduleOverrideReason = input.overrideReason!.trim();
+          await tx.workOrderEvent.create({
+            data: {
+              tenantId,
+              workOrderId: current.id,
+              eventType: 'work_order.dispatch_override',
+              actorId: actor.userId,
+              metadataJson: {
+                reason: input.overrideReason!.trim(),
+                conflicts: evaluation.conflicts.map((conflict) => conflict.type),
+                scheduledStart: effectiveStart.toISOString(),
+                scheduledEnd: effectiveEnd.toISOString(),
+              } as Prisma.InputJsonValue,
+            },
+          });
+        }
       }
 
       const updated = (await tx.workOrder.update({
@@ -526,6 +596,37 @@ export class WorkOrdersService {
             code: 'BRANCH_SCOPE_MISMATCH',
           });
         }
+
+        // Faz 06 — çift rezervasyon engeli (ADR-0008): atamayla birlikte
+        // yürürlüğe giren tam pencere için çakışma denetimi. Override yalnız
+        // work_orders:dispatch_override izni + zorunlu nedenle geçerli.
+        const effectiveStart = input.scheduledStart
+          ? new Date(input.scheduledStart)
+          : current.scheduledStart;
+        const effectiveEnd = input.scheduledEnd
+          ? new Date(input.scheduledEnd)
+          : current.scheduledEnd;
+        if (effectiveStart && effectiveEnd && effectiveEnd > effectiveStart) {
+          const evaluation = await this.scheduleConflicts.assertNoConflicts(
+            tx,
+            tenantId,
+            {
+              assigneeUserId: target.userId,
+              window: { start: effectiveStart, end: effectiveEnd },
+              excludeWorkOrderId: current.id,
+            },
+            {
+              requested: input.overrideConflict === true,
+              reason: input.overrideReason,
+            },
+            actor.permissions,
+          );
+          if (evaluation.overridden) {
+            extra.scheduleOverrideReason = input.overrideReason!.trim();
+            eventMetadata.conflicts = evaluation.conflicts.map((conflict) => conflict.type);
+          }
+        }
+
         extra.assignedTo = { connect: { id: target.userId } };
         eventMetadata.assigneeUserId = target.userId;
       }
@@ -607,6 +708,29 @@ export class WorkOrdersService {
             metadataJson: { assigneeUserId: input.assigneeUserId },
           },
         });
+        // Faz 06 — bilinçli çakışma üzerine atama denetim izi (neden + bulgular).
+        if (extra.scheduleOverrideReason) {
+          await tx.workOrderEvent.create({
+            data: {
+              tenantId,
+              workOrderId: current.id,
+              eventType: 'work_order.dispatch_override',
+              actorId: actor.userId,
+              metadataJson: {
+                reason: extra.scheduleOverrideReason,
+                conflicts: eventMetadata.conflicts ?? [],
+                scheduledStart: (input.scheduledStart
+                  ? new Date(input.scheduledStart)
+                  : current.scheduledStart
+                )?.toISOString(),
+                scheduledEnd: (input.scheduledEnd
+                  ? new Date(input.scheduledEnd)
+                  : current.scheduledEnd
+                )?.toISOString(),
+              } as Prisma.InputJsonValue,
+            },
+          });
+        }
       }
       if (rule.action === 'UNASSIGN') {
         await tx.workOrderAssignment.updateMany({
@@ -790,7 +914,8 @@ export class WorkOrdersService {
   // ------------------------- Görünüm eşleme -------------------------
 
   /** RLS kapsamı dışında (transaction sonrası) saf eşleme — testlerde de kullanılır. */
-  static toView(row: WorkOrderRow): WorkOrderView {
+  static toView(row: WorkOrderRow, now: Date = new Date()): WorkOrderView {
+    const sla = slaState(row.slaDueAt, row.status, now);
     return {
       workOrderId: row.id,
       workOrderNo: row.workOrderNo,
@@ -818,6 +943,10 @@ export class WorkOrdersService {
       closedAt: row.closedAt?.toISOString() ?? null,
       cancelledAt: row.cancelledAt?.toISOString() ?? null,
       cancellationReason: row.cancellationReason,
+      slaDueAt: row.slaDueAt?.toISOString() ?? null,
+      slaBreached: sla.breached,
+      slaAtRisk: sla.atRisk,
+      scheduleOverrideReason: row.scheduleOverrideReason,
       version: row.version,
       createdById: row.createdById,
       createdAt: row.createdAt.toISOString(),

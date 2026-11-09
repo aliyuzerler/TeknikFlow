@@ -4,3 +4,4 @@ export * from './auth.js';
 export * from './tenants.js';
 export * from './crm.js';
 export * from './service.js';
+export * from './dispatch.js';

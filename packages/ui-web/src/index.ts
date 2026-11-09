@@ -94,3 +94,11 @@ export {
 
 // Kanca
 export { useFocusTrap } from './hooks/use-focus-trap.js';
+
+// Faz 06: dispatch panosu bileşenleri
+export { MeterBar, type MeterBarProps } from './components/meter-bar.js';
+export {
+  SegmentedControl,
+  type SegmentedControlProps,
+  type SegmentedOption,
+} from './components/segmented-control.js';

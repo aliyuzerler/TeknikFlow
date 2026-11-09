@@ -54,6 +54,11 @@ model User {
   workOrderEvents  WorkOrderEvent[] @relation("WorkOrderEventActor")
   workOrderNotes   WorkOrderNote[] @relation("WorkOrderNoteAuthor")
 
+  // Faz 06 — dispatch ilişkileri (kiracı başına bir profil)
+  technicianProfiles TechnicianProfile[]
+  userSkills   UserSkill[]
+  teamMembers  TeamMember[]
+
   @@map("users")
 }
 
@@ -100,6 +105,16 @@ model Tenant {
   workOrderNotes    WorkOrderNote[]
   workOrderCounters WorkOrderCounter[]
 
+  // Faz 06 — dispatch
+  technicianProfiles TechnicianProfile[]
+  workingHours    WorkingHour[]
+  timeOffs        TimeOff[]
+  skills          Skill[]
+  userSkills      UserSkill[]
+  teams           Team[]
+  teamMembers     TeamMember[]
+  categorySkills  ServiceCategorySkill[]
+
   @@map("tenants")
 }
 
@@ -123,6 +138,7 @@ model Branch {
   updatedAt DateTime @updatedAt
 
   workOrders WorkOrder[]
+  teams      Team[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -571,6 +587,7 @@ model ServiceCategory {
   updatedAt   DateTime @updatedAt
 
   serviceRequests ServiceRequest[]
+  requiredSkills ServiceCategorySkill[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -688,6 +705,12 @@ model WorkOrder {
   cancelledAt       DateTime?
   cancellationReason CancellationReason?
   cancellationNote    String?
+  /// Faz 06 — dispatch: talepten devralınan ya da öncelik politikasından
+  /// hesaplanan çözüm süresi sınırı (UTC). Pano SLA uyarıları bundan üretilir.
+  slaDueAt           DateTime?
+  /// Çakışma ÜZERİNE bilinçli planlamanın nedeni (denetim izi; olay akışında
+  /// work_order.dispatch_override olayıyla birlikte tam bağlam yazılır).
+  scheduleOverrideReason String?
   version           Int              @default(0)
   createdById       String?
   createdBy         User?            @relation("WorkOrderCreator", fields: [createdById], references: [id])
@@ -823,4 +846,171 @@ model WorkOrderCounter {
 
   @@id([tenantId, year])
   @@map("work_order_counters")
+}
+
+// ---------------------------------------------------------------------------
+// Faz 06 — DISPATCH: teknisyen profili, çalışma saatleri, izinler,
+// yetenekler, takımlar. Tüm tablolar RLS FORCE (migration'da politika).
+// ---------------------------------------------------------------------------
+
+/// Teknisyen dispatch profili — atanabilir üyenin planlama öznitelikleri.
+/// Profil YOKSA üye yine atanabilir; çalışma saati kısıtı uygulanmaz
+/// (motor "veri yoksa kısıt yok" ilkesiyle çalışır, ADR-0008).
+model TechnicianProfile {
+  id            String  @id @default(uuid())
+  tenantId      String
+  tenant        Tenant  @relation(fields: [tenantId], references: [id])
+  userId        String
+  user          User    @relation(fields: [userId], references: [id])
+  /// Servis bölgesi (serbest metin; örn. "Kocaeli / Gebze OSB").
+  territory     String?
+  /// Günlük planlama üst sınırı (dakika). Çalışma pencereleri hariç.
+  dailyCapacityMinutes Int @default(480)
+  active        Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workingHours WorkingHour[]
+  timeOffs     TimeOff[]
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@map("technician_profiles")
+}
+
+/// Haftalık yinelenen çalışma penceresi. weekday: 1=Pazartesi...7=Pazar
+/// (ISO-8601); startMinute/endMinute yerel gün içindeki dakika (0..1440).
+/// Saat dilimi KIRACININKİDİR; motor UTC anlarına çevirir (DST güvenli).
+model WorkingHour {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  profileId   String
+  profile     TechnicianProfile @relation(fields: [profileId], references: [id])
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, profileId])
+  @@map("working_hours")
+}
+
+/// Tek seferlik teknisyen izni (tatil/rapor vb.). UTC an aralığı;
+/// ACTIVE iken çakışan planlamalar TIME_OFF çakışması üretir.
+model TimeOff {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  profileId String
+  profile   TechnicianProfile @relation(fields: [profileId], references: [id])
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+  status    TimeOffStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, profileId, startAt])
+  @@map("time_offs")
+}
+
+enum TimeOffStatus {
+  ACTIVE
+  CANCELLED
+  @@map("time_off_status")
+}
+
+/// Yetenek kataloğu — kiracıya özel; atanabilirlik eşleştirmesinde kullanılır.
+model Skill {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  key         String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userSkills UserSkill[]
+  requiredByCategories ServiceCategorySkill[]
+
+  @@unique([tenantId, key])
+  @@map("skills")
+}
+
+/// Kullanıcı yeteneği — seviye 1..5 (denetim sözleşmede).
+model UserSkill {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  skillId   String
+  skill     Skill    @relation(fields: [skillId], references: [id])
+  level     Int      @default(3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId, skillId])
+  @@index([tenantId, userId])
+  @@map("user_skills")
+}
+
+/// Takım — planlama kapasitesi toplamı ve saha organizasyonu.
+/// Şube bağlamı opsiyonel (kiracı çapında takım mümkün).
+model Team {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  name      String
+  code      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members TeamMember[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("teams")
+}
+
+/// Takım üyeliği — bir kullanıcı en çok bir takımda (MVP kuralı;
+/// (tenantId, userId) tekil). teamLead işaretçi özniteliğidir.
+model TeamMember {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  teamLead  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, teamId])
+  @@map("team_members")
+}
+
+/// Faz 06 — kategori zorunlu yetenekleri: bu kategoriden açılan işler için
+/// atanacak teknisyenin sahip olması önerilen yetenekler (DANIŞMA — engellemez;
+/// eksikse planlama yanıtında skillWarnings döner, ADR-0008).
+model ServiceCategorySkill {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  categoryId String
+  category   ServiceCategory @relation(fields: [categoryId], references: [id])
+  skillId    String
+  skill      Skill    @relation(fields: [skillId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, categoryId, skillId])
+  @@index([tenantId, categoryId])
+  @@map("service_category_skills")
 }

@@ -218,7 +218,9 @@ export const CreateWorkOrderRequestSchema = z
   );
 export type CreateWorkOrderRequest = z.infer<typeof CreateWorkOrderRequestSchema>;
 
-/** Alan/schedule düzenleme — iyimser eşzamanlılık (expectedVersion). */
+/** Alan/schedule düzenleme — iyimser eşzamanlılık (expectedVersion).
+ * Faz 06: atanan işin schedule değişiminde çakışma denetimi çalışır;
+ * bilinçli üzerine planlama için overrideConflict + overrideReason. */
 export const UpdateWorkOrderRequestSchema = z
   .object({
     subject: z.string().trim().min(4).max(200).optional(),
@@ -228,6 +230,8 @@ export const UpdateWorkOrderRequestSchema = z
     branchId: z.string().uuid().nullable().optional(),
     scheduledStart: z.string().datetime().nullable().optional(),
     scheduledEnd: z.string().datetime().nullable().optional(),
+    overrideConflict: z.boolean().optional(),
+    overrideReason: z.string().trim().min(10).max(500).optional(),
     expectedVersion: z.number().int().nonnegative(),
   })
   .refine(
@@ -248,6 +252,7 @@ export type UpdateWorkOrderRequest = z.infer<typeof UpdateWorkOrderRequestSchema
  * Birleşik geçiş ucu — POST /work-orders/:id/transition.
  * Parametreler hedef duruma göre: ASSIGNED → assigneeUserId;
  * PLANNED → scheduledStart/scheduledEnd/branchId; CANCELLED → reasonCode+note.
+ * Faz 06: ASSIGNED hedefinde çakışma denetimi (override alanları opsiyonel).
  */
 export const TransitionWorkOrderRequestSchema = z
   .object({
@@ -258,6 +263,8 @@ export const TransitionWorkOrderRequestSchema = z
     scheduledStart: z.string().datetime().optional(),
     scheduledEnd: z.string().datetime().optional(),
     branchId: z.string().uuid().optional(),
+    overrideConflict: z.boolean().optional(),
+    overrideReason: z.string().trim().min(10).max(500).optional(),
     expectedVersion: z.number().int().nonnegative().optional(),
   })
   .superRefine((value, ctx) => {
@@ -352,6 +359,12 @@ export const WorkOrderViewSchema = z.object({
   closedAt: z.string().datetime().nullable(),
   cancelledAt: z.string().datetime().nullable(),
   cancellationReason: CancellationReasonSchema.nullable(),
+  // Faz 06: dispatch SLA takibi (talepten devralınır ya da öncelik
+  // politikasından hesaplanır) ve bilinçli çakışma-üzerine planlama nedeni.
+  slaDueAt: z.string().datetime().nullable(),
+  slaBreached: z.boolean(),
+  slaAtRisk: z.boolean(),
+  scheduleOverrideReason: z.string().nullable(),
   version: z.number().int().nonnegative(),
   createdById: z.string().nullable(),
   createdAt: z.string().datetime(),

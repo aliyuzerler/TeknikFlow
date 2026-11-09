@@ -29,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const canViewWorkOrders =
     permissions.includes('work_orders:view_all') ||
     permissions.includes('work_orders:view_assigned');
+  const canViewDispatch = permissions.includes('work_orders:view_all');
 
   const navSections: NavSection[] = [
     {
@@ -52,6 +53,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 label: 'İş Emirleri',
                 icon: 'work-orders' as const,
                 href: '/app/work-orders',
+              },
+            ]
+          : []),
+        ...(canViewDispatch
+          ? [
+              {
+                id: 'dispatch',
+                label: 'Dispatch Panosu',
+                icon: 'dispatch' as const,
+                href: '/app/dispatch',
               },
             ]
           : []),

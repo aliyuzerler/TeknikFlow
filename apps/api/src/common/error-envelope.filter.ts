@@ -36,6 +36,13 @@ export interface ErrorEnvelope {
   requestId: string;
   statusCode: number;
   fieldErrors?: Array<{ field: string; message: string }>;
+  /** Faz 06: 409 SCHEDULE_CONFLICT bulguları (kendi kiracısındaki kayıtlar). */
+  conflicts?: Array<{
+    type: string;
+    message: string;
+    workOrderId: string | null;
+    workOrderNo: string | null;
+  }>;
 }
 
 function readRequestId(request: Request): string {
@@ -69,6 +76,8 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
     // Faz 04: güvenli ek bağlam alanları (çakışan kaydın KENDİ kiracısındaki
     // kimliği vb.) — yalnız beyin listedeki anahtarlar taşınır.
     const details = extractSafeDetails(body);
+    // Faz 06: planlama çakışması bulguları (aynı kiracının iş emirleri).
+    const conflicts = extractConflicts(body);
     return {
       code,
       message,
@@ -76,6 +85,7 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
       statusCode,
       ...(fieldErrors ? { fieldErrors } : {}),
       ...(details ? { details } : {}),
+      ...(conflicts ? { conflicts } : {}),
     };
   }
 
@@ -121,6 +131,38 @@ function extractSafeDetails(body: string | object): Record<string, string | numb
     }
   }
   return Object.keys(details).length > 0 ? details : undefined;
+}
+
+/**
+ * Faz 06 — SCHEDULE_CONFLICT gövdesindeki çakışma listesi: yalnız iyi
+ * biçimli satırlar taşınır (type/message + kendi kiracısının iş emri
+ * kimlikleri). Beyin liste dışı hiçbir alan geçmez.
+ */
+function extractConflicts(body: string | object): ErrorEnvelope['conflicts'] | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  if (!('conflicts' in body) || !Array.isArray((body as { conflicts?: unknown }).conflicts)) {
+    return undefined;
+  }
+  const rows = (body as { conflicts: unknown[] }).conflicts;
+  const parsed: NonNullable<ErrorEnvelope['conflicts']> = [];
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const record = row as Record<string, unknown>;
+    if (
+      typeof record.type === 'string' &&
+      typeof record.message === 'string' &&
+      (record.workOrderId === null || typeof record.workOrderId === 'string') &&
+      (record.workOrderNo === null || typeof record.workOrderNo === 'string')
+    ) {
+      parsed.push({
+        type: record.type,
+        message: record.message,
+        workOrderId: record.workOrderId as string | null,
+        workOrderNo: record.workOrderNo as string | null,
+      });
+    }
+  }
+  return parsed.length > 0 ? parsed : undefined;
 }
 
 /** İstisna gövdesindeki açık kod (varsa) — genel kod yerine geçer. */

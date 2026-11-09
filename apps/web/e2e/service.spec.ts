@@ -54,8 +54,8 @@ test.describe('talep → iş emri yaşam döngüsü (seri)', () => {
     // 4) Planlama çekmecesi.
     await page.getByRole('button', { name: 'Planla' }).click();
     const planDrawer = page.getByRole('dialog', { name: 'İş emrini planla' });
-    await planDrawer.getByLabel('Planlanan başlangıç').fill('2026-12-05T09:00');
-    await planDrawer.getByLabel('Planlanan bitiş').fill('2026-12-05T13:00');
+    await planDrawer.getByLabel('Planlanan başlangıç').fill('2026-12-04T09:00');
+    await planDrawer.getByLabel('Planlanan bitiş').fill('2026-12-04T13:00');
     await planDrawer.getByRole('button', { name: 'Planlamayı kaydet' }).click();
     await expect(page.getByText('Planlandı').first()).toBeVisible({ timeout: 10_000 });
 

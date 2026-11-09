@@ -208,6 +208,9 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
 
     // ---- Faz 05: demo servis akışı (talepler + iş emirleri) ----
     await seedDemoService(tx, tenant.id, ownerUserId ?? '');
+
+    // ---- Faz 06: dispatch demo (çalışma saatleri, izin, yetenek, takım) ----
+    await seedDemoDispatch(tx, tenant.id, ownerUserId ?? '');
   });
 
   console.log(
@@ -892,6 +895,14 @@ async function seedDemoService(
         description: spec.description,
         scheduledStart,
         scheduledEnd,
+        // Faz 06 — SLA: dönüşende talebin sözü, doğrudanda öncelik politikası.
+        slaDueAt: linkedRequest?.slaDueAt
+          ? linkedRequest.slaDueAt
+          : new Date(
+              createdAt.getTime() +
+                (slaPolicies.find((p) => p.priority === spec.priority)?.resolveMinutes ?? 1440) *
+                  60_000,
+            ),
         assignedToId: spec.assignee ?? null,
         version: (STATUS_PATH[spec.status] ?? []).length,
         createdById: ownerId,
@@ -1049,5 +1060,263 @@ async function seedDemoService(
   console.log(
     `[seed] Faz 05 demo: ${categories.length} kategori, ${slaPolicies.length} SLA politikası, ` +
       `3 talep + 8 iş emri (WO-${year}-0001..0008)`,
+  );
+}
+
+/**
+ * Faz 06 — dispatch demo verisi: teknisyen profilleri, çalışma saatleri,
+ * izin, yetenek kataloğu + atamaları, kategori-yetenek eşlemeleri ve
+ * takımlar. Kurgusal; yalnızca demo/test (üretim kod yolunda mock yok).
+ * Tekrar çalıştırılabilir (upsert/find-guard desenleri).
+ */
+async function seedDemoDispatch(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  _ownerId: string,
+): Promise<void> {
+  const technicianRole = await tx.role.findFirstOrThrow({
+    where: { key: 'technician', tenantId: null },
+  });
+  const technicianMemberships = await tx.membership.findMany({
+    where: { tenantId, roleId: technicianRole.id, status: 'ACTIVE' },
+    include: { user: true },
+  });
+  const technicianByName = new Map(
+    technicianMemberships.map((m) => [m.user.displayName, m.user.id]),
+  );
+  const emre = technicianByName.get('Emre Yılmaz');
+  const selin = technicianByName.get('Selin Arslan');
+  const burak = technicianByName.get('Burak Koç');
+
+  // ---- Yetenek kataloğu ----
+  const skills: Array<{ key: string; name: string; description: string }> = [
+    {
+      key: 'hvac',
+      name: 'İklimlendirme (HVAC)',
+      description: 'Soğutma/ısıtma santralleri ve chiller',
+    },
+    { key: 'elektrik', name: 'Elektrik', description: 'Pano, güç ve kontrol devreleri' },
+    { key: 'mekanik', name: 'Mekanik', description: 'Pompa, kompresör, tahrik' },
+    { key: 'sogutma', name: 'Soğutma Sistemleri', description: 'Refrigerant ve soğuk oda' },
+    { key: 'tesisat', name: 'Tesisat', description: 'Su ve sıhhi tesisat' },
+  ];
+  for (const skill of skills) {
+    await tx.skill.upsert({
+      where: { tenantId_key: { tenantId, key: skill.key } },
+      create: { tenantId, ...skill },
+      update: { name: skill.name, description: skill.description },
+    });
+  }
+  const skillByKey = new Map(
+    (await tx.skill.findMany({ where: { tenantId } })).map((s) => [s.key, s.id]),
+  );
+
+  // ---- Kategori → zorunlu yetenek eşlemeleri (danışma eşleştirme) ----
+  const categoryLinks: Array<{ categoryKey: string; skillKeys: string[] }> = [
+    { categoryKey: 'hvac', skillKeys: ['hvac', 'sogutma'] },
+    { categoryKey: 'electrical', skillKeys: ['elektrik'] },
+    { categoryKey: 'mechanical', skillKeys: ['mekanik'] },
+    { categoryKey: 'plumbing', skillKeys: ['tesisat'] },
+  ];
+  for (const link of categoryLinks) {
+    const category = await tx.serviceCategory.findFirst({
+      where: { tenantId, key: link.categoryKey },
+      select: { id: true },
+    });
+    if (!category) continue;
+    for (const skillKey of link.skillKeys) {
+      const skillId = skillByKey.get(skillKey);
+      if (!skillId) continue;
+      await tx.serviceCategorySkill.upsert({
+        where: {
+          tenantId_categoryId_skillId: { tenantId, categoryId: category.id, skillId },
+        },
+        create: { tenantId, categoryId: category.id, skillId },
+        update: {},
+      });
+    }
+  }
+
+  // ---- Teknisyen profilleri + çalışma saatleri ----
+  interface ProfileSpec {
+    userId?: string;
+    territory: string;
+    dailyCapacityMinutes: number;
+    hours: Array<{ weekday: number; startMinute: number; endMinute: number }>;
+    userSkills: Array<{ key: string; level: number }>;
+  }
+  const profileSpecs: ProfileSpec[] = [
+    {
+      userId: emre,
+      territory: 'İstanbul / Gebze koridoru',
+      dailyCapacityMinutes: 480,
+      hours: [
+        { weekday: 1, startMinute: 540, endMinute: 1080 },
+        { weekday: 2, startMinute: 540, endMinute: 1080 },
+        { weekday: 3, startMinute: 540, endMinute: 1080 },
+        { weekday: 4, startMinute: 540, endMinute: 1080 },
+        { weekday: 5, startMinute: 540, endMinute: 1080 },
+      ],
+      userSkills: [
+        { key: 'mekanik', level: 5 },
+        { key: 'sogutma', level: 4 },
+        { key: 'hvac', level: 3 },
+      ],
+    },
+    {
+      userId: selin,
+      territory: 'İstanbul Avrupa yakası',
+      dailyCapacityMinutes: 480,
+      // Öğlen aralıklı split pencere (aynı günde çoklu pencere demosu):
+      hours: [
+        { weekday: 1, startMinute: 540, endMinute: 780 },
+        { weekday: 1, startMinute: 840, endMinute: 1080 },
+        { weekday: 2, startMinute: 540, endMinute: 780 },
+        { weekday: 2, startMinute: 840, endMinute: 1080 },
+        { weekday: 3, startMinute: 540, endMinute: 780 },
+        { weekday: 3, startMinute: 840, endMinute: 1080 },
+        { weekday: 4, startMinute: 540, endMinute: 780 },
+        { weekday: 4, startMinute: 840, endMinute: 1080 },
+        { weekday: 5, startMinute: 540, endMinute: 780 },
+        { weekday: 5, startMinute: 840, endMinute: 1080 },
+      ],
+      userSkills: [
+        { key: 'hvac', level: 5 },
+        { key: 'elektrik', level: 4 },
+      ],
+    },
+    {
+      userId: burak,
+      territory: 'Ankara ve çevresi',
+      dailyCapacityMinutes: 540,
+      hours: [
+        { weekday: 1, startMinute: 510, endMinute: 1050 },
+        { weekday: 2, startMinute: 510, endMinute: 1050 },
+        { weekday: 3, startMinute: 510, endMinute: 1050 },
+        { weekday: 4, startMinute: 510, endMinute: 1050 },
+        { weekday: 5, startMinute: 510, endMinute: 1050 },
+        { weekday: 6, startMinute: 510, endMinute: 840 },
+      ],
+      userSkills: [
+        { key: 'elektrik', level: 5 },
+        { key: 'mekanik', level: 3 },
+        { key: 'tesisat', level: 4 },
+      ],
+    },
+  ];
+
+  for (const spec of profileSpecs) {
+    if (!spec.userId) continue;
+    const profile = await tx.technicianProfile.upsert({
+      where: { tenantId_userId: { tenantId, userId: spec.userId } },
+      create: {
+        tenantId,
+        userId: spec.userId,
+        territory: spec.territory,
+        dailyCapacityMinutes: spec.dailyCapacityMinutes,
+        active: true,
+      },
+      update: { territory: spec.territory, dailyCapacityMinutes: spec.dailyCapacityMinutes },
+    });
+    const existingHours = await tx.workingHour.findFirst({
+      where: { tenantId, profileId: profile.id },
+      select: { id: true },
+    });
+    if (!existingHours) {
+      await tx.workingHour.createMany({
+        data: spec.hours.map((hour) => ({
+          tenantId,
+          profileId: profile.id,
+          ...hour,
+        })),
+      });
+    }
+    for (const userSkill of spec.userSkills) {
+      const skillId = skillByKey.get(userSkill.key);
+      if (!skillId) continue;
+      await tx.userSkill.upsert({
+        where: {
+          tenantId_userId_skillId: { tenantId, userId: spec.userId, skillId },
+        },
+        create: { tenantId, userId: spec.userId, skillId, level: userSkill.level },
+        update: { level: userSkill.level },
+      });
+    }
+  }
+
+  // ---- İzin: Selin 3 günlük yıllık izin (tohumlama anından itibaren +3/+6 gün) ----
+  if (selin) {
+    const profile = await tx.technicianProfile.findFirst({
+      where: { tenantId, userId: selin },
+      select: { id: true },
+    });
+    if (profile) {
+      const existingTimeOff = await tx.timeOff.findFirst({
+        where: { tenantId, profileId: profile.id, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!existingTimeOff) {
+        const now = Date.now();
+        await tx.timeOff.create({
+          data: {
+            tenantId,
+            profileId: profile.id,
+            startAt: new Date(now + 3 * 24 * 60 * 60 * 1000),
+            endAt: new Date(now + 6 * 24 * 60 * 60 * 1000),
+            reason: 'Yıllık izin (demo)',
+          },
+        });
+      }
+    }
+  }
+
+  // ---- Takımlar ----
+  const branches = await tx.branch.findMany({ where: { tenantId } });
+  const branchByCode = new Map(branches.map((b) => [b.code, b.id]));
+  const teamSpecs: Array<{
+    name: string;
+    code: string;
+    branchCode?: string;
+    members: Array<{ userId?: string; teamLead: boolean }>;
+  }> = [
+    {
+      name: 'İstanbul Saha Ekibi',
+      code: 'IST-SAHA',
+      branchCode: 'IST-MRKZ',
+      members: [
+        { userId: emre, teamLead: true },
+        { userId: selin, teamLead: false },
+      ],
+    },
+    {
+      name: 'Ankara Bakım Ekibi',
+      code: 'ANK-BAKIM',
+      branchCode: 'ANK-SRVS',
+      members: [{ userId: burak, teamLead: true }],
+    },
+  ];
+  for (const spec of teamSpecs) {
+    const team = await tx.team.upsert({
+      where: { tenantId_code: { tenantId, code: spec.code } },
+      create: {
+        tenantId,
+        name: spec.name,
+        code: spec.code,
+        ...(spec.branchCode ? { branchId: branchByCode.get(spec.branchCode) ?? null } : {}),
+      },
+      update: { name: spec.name },
+    });
+    for (const member of spec.members) {
+      if (!member.userId) continue;
+      await tx.teamMember.upsert({
+        where: { tenantId_userId: { tenantId, userId: member.userId } },
+        create: { tenantId, teamId: team.id, userId: member.userId, teamLead: member.teamLead },
+        update: { teamId: team.id, teamLead: member.teamLead },
+      });
+    }
+  }
+
+  console.log(
+    `[seed] Faz 06 demo: ${skills.length} yetenek, 3 profil + çalışma saati, 1 izin, 2 takım`,
   );
 }
