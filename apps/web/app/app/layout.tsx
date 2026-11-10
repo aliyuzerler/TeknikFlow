@@ -30,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     permissions.includes('work_orders:view_all') ||
     permissions.includes('work_orders:view_assigned');
   const canViewDispatch = permissions.includes('work_orders:view_all');
+  const canViewStock = permissions.includes('stock:view');
 
   const navSections: NavSection[] = [
     {
@@ -79,6 +80,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 label: 'Ekipmanlar',
                 icon: 'assets' as const,
                 href: '/app/assets',
+              },
+            ]
+          : []),
+        ...(canViewStock
+          ? [
+              {
+                id: 'inventory',
+                label: 'Stok',
+                icon: 'warehouse' as const,
+                href: '/app/inventory',
               },
             ]
           : []),

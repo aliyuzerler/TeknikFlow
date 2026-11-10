@@ -22,7 +22,7 @@ function makeDeps(online: boolean) {
     isOnline: () => online,
     drain: jest.fn(async () => ({ sent: online ? 1 : 0, failed: 0 })),
     captureLocation: jest.fn(async () => ({
-      granted: true,
+      granted: true as const,
       fix: {
         latitude: 41.0082,
         longitude: 28.9784,
@@ -88,7 +88,9 @@ describe('createExecutionActions', () => {
 
   it('izin reddi: manuel onay istenir (needsManualArrival)', async () => {
     const deps = makeDeps(true);
-    deps.captureLocation = jest.fn(async () => ({ granted: false }));
+    deps.captureLocation = jest.fn(async () => ({
+      granted: false,
+    })) as unknown as typeof deps.captureLocation;
     const actions = createExecutionActions(deps);
     const outcome = await actions.arrive(WORK_ORDER);
     expect(outcome).toEqual({
@@ -119,6 +121,7 @@ describe('createExecutionActions', () => {
     const actions = createExecutionActions(deps);
     await actions.toggleChecklistItem(WORK_ORDER, {
       itemId: 'item-9',
+      workOrderId: WORK_ORDER,
       label: 'Test',
       detail: null,
       required: true,
@@ -154,7 +157,8 @@ describe('createExecutionActions', () => {
 
   it('oturum yoksa eylem reddedilir (kuyruğa hiçbir şey girmez)', async () => {
     const deps = makeDeps(true);
-    deps.identity = async () => null;
+    deps.identity = (async (): Promise<{ userId: string; tenantId: string } | null> =>
+      null) as unknown as typeof deps.identity;
     const actions = createExecutionActions(deps);
     const outcome = await actions.transition(WORK_ORDER, 'ACCEPTED');
     expect(outcome).toEqual({ ok: false, message: 'Oturum kapalı — eylem kaydedilemedi' });

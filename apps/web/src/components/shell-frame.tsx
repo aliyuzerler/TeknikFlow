@@ -25,6 +25,7 @@ const PATH_TO_NAV_ID: Readonly<Record<string, string>> = {
   '/app/assets': 'assets',
   '/app/users': 'users',
   '/app/branches': 'branches',
+  '/app/inventory': 'inventory',
 };
 
 function activeNavId(pathname: string, fallback: string): string {

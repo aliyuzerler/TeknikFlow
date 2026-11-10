@@ -15,6 +15,8 @@ import {
   SignatureViewSchema,
   TimeEntryListResponseSchema,
   TimeEntryViewSchema,
+  BalanceListResponseSchema,
+  PartConsumptionViewSchema,
   type ApiErrorEnvelope,
   type LoginMobileResponse,
   type LoginSelectionResponse,
@@ -37,6 +39,9 @@ import {
   type TimeEntryView,
   type TransitionWorkOrderRequest,
   type WorkOrderStatus,
+  type BalanceView,
+  type ConsumePartRequest,
+  type PartConsumptionView,
 } from '@teknikflow/contracts';
 import { z } from 'zod';
 import type { SecureTokenStore } from '../session/token-store';
@@ -142,6 +147,15 @@ export interface MobileApiClient {
     location: GpsLocation,
     idempotencyKey?: string,
   ): Promise<ApiResult<WorkOrderView> & { replayed?: boolean }>;
+  // ---- Faz 09: stok ----
+  /** Kendi araç stoğu (mine=true) — çevrimdışı tüketim için cache kaynağı. */
+  listVanStock(): Promise<ApiResult<BalanceView[]>>;
+  /** İş emri parça tüketimi — atomik + idempotent (outbox yürütücüsü kullanır). */
+  consumePart(
+    workOrderId: string,
+    input: ConsumePartRequest,
+    idempotencyKey?: string,
+  ): Promise<ApiResult<PartConsumptionView> & { replayed?: boolean }>;
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -486,6 +500,28 @@ export function createMobileApiClient(options: MobileApiClientOptions): MobileAp
         ...(idempotencyKey ? { headers: { 'x-idempotency-key': idempotencyKey } } : {}),
         parser: TimeEntryViewSchema,
       }) as Promise<ApiResult<TimeEntryView> & { replayed?: boolean }>;
+    },
+
+    // ------------------------- Faz 09: stok -------------------------
+
+    async listVanStock() {
+      const result = await client.request({
+        method: 'GET',
+        path: '/api/v1/inventory/balances',
+        query: { mine: 'true' },
+        parser: BalanceListResponseSchema,
+      });
+      return result.ok ? { ok: true as const, data: result.data.data } : result;
+    },
+
+    async consumePart(workOrderId, input, idempotencyKey) {
+      return client.request({
+        method: 'POST',
+        path: `/api/v1/work-orders/${workOrderId}/parts`,
+        body: input,
+        ...(idempotencyKey ? { headers: { 'x-idempotency-key': idempotencyKey } } : {}),
+        parser: PartConsumptionViewSchema,
+      }) as Promise<ApiResult<PartConsumptionView> & { replayed?: boolean }>;
     },
 
     async listWorkOrderMedia(workOrderId) {

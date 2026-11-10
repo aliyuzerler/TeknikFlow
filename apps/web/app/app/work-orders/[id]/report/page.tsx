@@ -53,6 +53,12 @@ function formatMinutes(minutes: number): string {
   return rest === 0 ? `${hours} sa` : `${hours} sa ${rest} dk`;
 }
 
+/** Kuruş → görüntüleme (kiracı para birimi yerelliği). */
+function formatMoney(minor: number | null): string {
+  if (minor === null) return '—';
+  return `${(minor / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`;
+}
+
 /** Strokes'u SVG polyline'lara çevirir (rapor görünümü — salt okunur). */
 function SignatureSketch({
   strokes,
@@ -171,6 +177,54 @@ export default async function ExecutionReportPage({ params }: { params: Promise<
               },
             ]}
           />
+        </Panel>
+
+        {/* Faz 09 — parça tüketimi ve malzeme maliyeti */}
+        <Panel
+          title="Parçalar ve malzeme maliyeti"
+          headingLevel={2}
+          subtitle={`${report.parts.length} tüketim kaydı`}
+        >
+          {report.parts.length === 0 ? (
+            <p className="tf-panel__subtitle" style={{ marginTop: 0 }}>
+              Bu iş emrinde parça tüketimi kaydedilmemiş.
+            </p>
+          ) : (
+            <>
+              <table className="tf-table" aria-label="Tüketilen parçalar">
+                <thead>
+                  <tr>
+                    <th scope="col">SKU / Kalem</th>
+                    <th scope="col">Miktar</th>
+                    <th scope="col">Lot/Seri</th>
+                    <th scope="col">Depo</th>
+                    <th scope="col">Maliyet</th>
+                    <th scope="col">Zaman</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.parts.map((part) => (
+                    <tr key={part.movementId}>
+                      <td>
+                        <span className="tf-table__wo">{part.sku}</span> — {part.itemName}
+                      </td>
+                      <td>
+                        {part.quantity} {part.unit}
+                      </td>
+                      <td>{part.lotNo ?? '—'}</td>
+                      <td>{part.warehouseName ?? '—'}</td>
+                      <td>{formatMoney(part.totalCostMinor)}</td>
+                      <td>{formatDateTime(part.occurredAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="tf-panel__subtitle" style={{ marginTop: 8 }}>
+                <strong>Toplam malzeme maliyeti: {formatMoney(report.partsCostMinor)}</strong> —
+                maliyet tüketim anındaki lot birim maliyetinden dondurulur (kuruş hassasiyetli).
+              </p>
+            </>
+          )}
         </Panel>
 
         <Panel title="Konum kayıtları" headingLevel={2} subtitle={`${report.visits.length} kayıt`}>

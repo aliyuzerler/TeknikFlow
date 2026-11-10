@@ -111,3 +111,9 @@ export {
   type SignaturePadProps,
   type SignaturePadStroke,
 } from './components/signature-pad.js';
+
+// Faz 09: miktar girdisi (stok tüketim/hareket formları)
+export {
+  QuantityInput,
+  type QuantityInputProps,
+} from './components/quantity-input.js';

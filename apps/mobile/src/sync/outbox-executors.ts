@@ -1,4 +1,8 @@
-import type { CaptureSignatureRequest, TransitionWorkOrderRequest } from '@teknikflow/contracts';
+import type {
+  CaptureSignatureRequest,
+  ConsumePartRequest,
+  TransitionWorkOrderRequest,
+} from '@teknikflow/contracts';
 import type { MobileApiClient } from '../api/client';
 import type { OutboxOperation } from '../cache/outbox-repo';
 
@@ -137,6 +141,15 @@ export const signatureExecutor: OutboxExecutor = async (api, op) => {
   return { ok: false, ...classified, replayed: result.replayed };
 };
 
+/** İş emri parça tüketimi — payload: ConsumePartRequest. */
+export const partsConsumeExecutor: OutboxExecutor = async (api, op) => {
+  const input = op.payload as unknown as ConsumePartRequest;
+  const result = await api.consumePart(op.entityId, input, op.idempotencyKey);
+  if (result.ok) return { ok: true, replayed: result.replayed };
+  const classified = httpError(result.error);
+  return { ok: false, ...classified, replayed: result.replayed };
+};
+
 /** İşlem kataloğu — kuyruktaki operation dizgesi → yürütücü. */
 export const OUTBOX_EXECUTORS: Readonly<Record<string, OutboxExecutor>> = {
   'work_order.transition': transitionExecutor,
@@ -146,6 +159,7 @@ export const OUTBOX_EXECUTORS: Readonly<Record<string, OutboxExecutor>> = {
   'time_entry.start': timeEntryStartExecutor,
   'time_entry.stop': timeEntryStopExecutor,
   'signature.capture': signatureExecutor,
+  'parts.consume': partsConsumeExecutor,
 };
 
 /** Yürütücüyü bul; bilinmeyen işlem → kalıcı reddi (hata mesajıyla). */

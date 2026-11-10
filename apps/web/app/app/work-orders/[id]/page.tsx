@@ -20,6 +20,7 @@ import {
 import { WorkOrderActions } from './work-order-actions';
 import { EditWorkOrderButton } from './edit-work-order';
 import { ExecutionPanel } from './execution-panel';
+import { PartsPanel } from './parts-panel';
 import { NoteForm } from './note-form';
 
 export const metadata = { title: 'İş Emri — TeknikFlow' };
@@ -209,6 +210,14 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
         {/* Faz 08 — saha yürütme: checklist + süre + imza */}
         <ExecutionPanel
+          workOrderId={workOrder.workOrderId}
+          status={workOrder.status}
+          permissions={permissions}
+          isAssignee={isAssignee}
+        />
+
+        {/* Faz 09 — parça tüketimi: araç stoğundan atomik tüketim */}
+        <PartsPanel
           workOrderId={workOrder.workOrderId}
           status={workOrder.status}
           permissions={permissions}

@@ -1,5 +1,6 @@
 import type { MobileApiClient } from '../api/client';
 import type { OutboxRepo } from '../cache/outbox-repo';
+import type { VanStockCache } from '../cache/van-stock-cache';
 import type { WorkOrderCache } from '../cache/work-order-cache';
 import { executorFor } from './outbox-executors';
 
@@ -11,6 +12,10 @@ import { executorFor } from './outbox-executors';
  * Faz 08 — yürütücüler bağlı: geçiş/GPS varış/checklist/süre/imza
  * işlemleri idempotency anahtarıyla gönderilir. Ağ hatası → üstel geri
  * ödeme; kalıcı reddi (4xx) → 24 saat dondurma (sunucu kazanır).
+ *
+ * Faz 09 — araç stoğu: çekme sırasında teknisyenin kendi aracına bağlı
+ * bakiyeler cache'e yazılır (best-effort; başarısızlık iş emri çekmesini
+ * bozmaz — tüketim formu çevrimiçinde sunucudan güncel alır).
  */
 
 export type SyncOutcome =
@@ -35,6 +40,8 @@ export interface SyncServiceDeps {
   api: MobileApiClient;
   workOrderCache: WorkOrderCache;
   outbox: OutboxRepo;
+  /** Faz 09 — araç stoğu cache (opsiyonel; testler basit kalabilir). */
+  vanStock?: VanStockCache;
   /** Çevrimiçi mi? (netinfo) — kapalıysa istek hiç açılmaz. */
   isOnline(): boolean;
   /** Oturum kimliği — cache anahtarları. */
@@ -51,7 +58,7 @@ export interface SyncService {
 }
 
 export function createSyncService(deps: SyncServiceDeps): SyncService {
-  const { api, workOrderCache, outbox, isOnline, getIdentity } = deps;
+  const { api, workOrderCache, outbox, vanStock, isOnline, getIdentity } = deps;
 
   async function identity(): Promise<{ userId: string; tenantId: string } | null> {
     return getIdentity();
@@ -74,6 +81,12 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
         if (!result.hasMore) break;
       }
       await workOrderCache.replaceAllForTenant(who.userId, who.tenantId, collected);
+
+      // Faz 09 — araç stoğu (best-effort; stok alınamazsa çekme yine ok).
+      if (vanStock) {
+        const stock = await api.listVanStock();
+        if (stock.ok) await vanStock.put(who.userId, stock.data);
+      }
       return { ok: true, pulled: collected.length };
     },
 
@@ -134,6 +147,7 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
     async clearLocal() {
       await workOrderCache.clear();
       await outbox.clear();
+      if (vanStock) await vanStock.clear();
     },
   };
 }

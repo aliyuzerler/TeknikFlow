@@ -1749,3 +1749,72 @@
   font-size: var(--tf-text-xs);
   color: var(--tf-muted);
 }
+
+/* Faz 09 — miktar girdisi (QuantityInput): adım düğmeleri + birim soneki. */
+.tf-qty {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  background: var(--tf-surface-alt);
+  min-height: 40px;
+  overflow: hidden;
+}
+
+.tf-qty:focus-within {
+  border-color: var(--tf-blue-600);
+  box-shadow: var(--tf-focus-ring);
+}
+
+.tf-qty--invalid {
+  border-color: var(--tf-red-600);
+}
+
+.tf-qty__control {
+  border: none;
+  background: transparent;
+  width: 88px;
+  min-height: 38px;
+  padding: 0 var(--tf-space-2);
+  font-size: var(--tf-text-sm);
+  text-align: center;
+  color: var(--tf-fg);
+}
+
+.tf-qty__control:focus {
+  outline: none;
+}
+
+.tf-qty__control:disabled {
+  color: var(--tf-muted);
+  cursor: not-allowed;
+}
+
+.tf-qty__unit {
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+  padding: 0 var(--tf-space-2);
+  border-left: 1px solid var(--tf-border);
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tf-qty__btn {
+  border: none;
+  background: transparent;
+  color: var(--tf-fg);
+  width: 32px;
+  align-self: stretch;
+  font-size: var(--tf-text-md);
+  cursor: pointer;
+}
+
+.tf-qty__btn:hover:not(:disabled) {
+  background: var(--tf-surface);
+}
+
+.tf-qty__btn:disabled {
+  color: var(--tf-muted);
+  cursor: not-allowed;
+}

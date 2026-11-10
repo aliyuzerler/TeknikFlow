@@ -4,6 +4,7 @@ import {
   arriveExecutor,
   checklistCompleteExecutor,
   executorFor,
+  partsConsumeExecutor,
   signatureExecutor,
   timeEntryStartExecutor,
   transitionExecutor,
@@ -25,6 +26,7 @@ function fakeApi(overrides: AnyRecord): MobileApiClient {
     createTimeEntry: jest.fn(async () => ({ ok: true, data: {}, replayed: false })),
     stopTimeEntry: jest.fn(async () => ({ ok: true, data: {}, replayed: false })),
     captureSignature: jest.fn(async () => ({ ok: true, data: {}, replayed: false })),
+    consumePart: jest.fn(async () => ({ ok: true, data: {}, replayed: false })),
     ...overrides,
   } as unknown as MobileApiClient;
 }
@@ -194,5 +196,53 @@ describe('signatureExecutor', () => {
       payload,
       '11111111-1111-4111-8111-111111111111',
     );
+  });
+});
+
+describe('partsConsumeExecutor (Faz 09)', () => {
+  const OP: OutboxOperation = {
+    ...BASE_OP,
+    operation: 'parts.consume',
+    payload: { itemId: 'item-1', quantity: 2, note: 'Filtre değişimi' },
+  };
+
+  it('idempotency anahtarını taşır ve tüketimi gönderir', async () => {
+    const api = fakeApi({
+      consumePart: jest.fn(async () => ({ ok: true, data: {}, replayed: false })),
+    });
+    const outcome = await partsConsumeExecutor(api, OP);
+    expect(outcome.ok).toBe(true);
+    expect(api.consumePart).toHaveBeenCalledWith('e1', OP.payload, OP.idempotencyKey);
+  });
+
+  it('stok aşımı (409 NEGATIVE_STOCK_FORBIDDEN) kalıcı reddedilir — yeniden denemez', async () => {
+    const api = fakeApi({
+      consumePart: jest.fn(async () => ({
+        ok: false,
+        error: {
+          kind: 'http' as const,
+          statusCode: 409,
+          message: 'Stok yetersiz — negatif bakiye onaysız oluşturulamaz',
+          code: 'NEGATIVE_STOCK_FORBIDDEN',
+        },
+      })),
+    });
+    const outcome = await partsConsumeExecutor(api, OP);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.retryable).toBe(false);
+    expect(outcome.message).toContain('Stok yetersiz');
+  });
+
+  it('sunucu oynatması (replay) bildirilir — çift tüketim yok', async () => {
+    const api = fakeApi({
+      consumePart: jest.fn(async () => ({ ok: true, data: {}, replayed: true })),
+    });
+    const outcome = await partsConsumeExecutor(api, OP);
+    expect(outcome.ok).toBe(true);
+    expect(outcome.replayed).toBe(true);
+  });
+
+  it('executorFor parts.consume yürütücüsünü bulur', () => {
+    expect(executorFor('parts.consume')).toBe(partsConsumeExecutor);
   });
 });

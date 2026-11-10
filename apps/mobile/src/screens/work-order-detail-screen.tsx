@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ExecutionReportView, WorkOrderView } from '@teknikflow/contracts';
+import type { BalanceView, ExecutionReportView, WorkOrderView } from '@teknikflow/contracts';
 import { EmptyView, ErrorView, LoadingView } from '../components/screen-states';
 import { StatusBadge } from '../components/status-badge';
 import { ExecutionPanel } from '../components/execution-panel';
+import { PartsPanel } from '../components/parts-panel';
 import { formatDateTime, formatScheduleWindow, slaLabel } from '../lib/format';
 import type { ExecutionActions } from './execution-actions';
 import { theme } from '../theme';
@@ -25,6 +26,8 @@ export interface WorkOrderDetailScreenProps {
     isOnline(): boolean;
     pendingCount(): Promise<number>;
     getReport(id: string): Promise<ExecutionReportView | null>;
+    /** Faz 09: kendi araç stoğu (cache) — opsiyonel. */
+    getVanStock?(): Promise<BalanceView[]>;
   };
   testIDPrefix?: string;
 }
@@ -39,6 +42,7 @@ export function WorkOrderDetailScreen({
   const [order, setOrder] = useState<WorkOrderView | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
   const [report, setReport] = useState<ExecutionReportView | null>(null);
+  const [vanStock, setVanStock] = useState<BalanceView[]>([]);
   const [pending, setPending] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -63,8 +67,10 @@ export function WorkOrderDetailScreen({
         execution.isOnline() ? execution.getReport(workOrderId) : Promise.resolve(null),
         execution.pendingCount(),
       ]);
+      const nextStock = execution.getVanStock ? await execution.getVanStock() : [];
       setReport(nextReport);
       setPending(nextPending);
+      setVanStock(nextStock);
     })();
   }, [workOrderId, execution, refreshTick, online]);
 
@@ -141,15 +147,26 @@ export function WorkOrderDetailScreen({
       </Section>
 
       {execution ? (
-        <ExecutionPanel
-          order={order}
-          actions={execution.actions}
-          report={report}
-          online={online}
-          pendingCount={pending}
-          onAfterAction={onAfterAction}
-          testIDPrefix={`${testIDPrefix}-execution`}
-        />
+        <>
+          <ExecutionPanel
+            order={order}
+            actions={execution.actions}
+            report={report}
+            online={online}
+            pendingCount={pending}
+            onAfterAction={onAfterAction}
+            testIDPrefix={`${testIDPrefix}-execution`}
+          />
+          <PartsPanel
+            order={order}
+            actions={execution.actions}
+            vanStock={vanStock}
+            report={report}
+            online={online}
+            onAfterAction={onAfterAction}
+            testIDPrefix={`${testIDPrefix}-parts`}
+          />
+        </>
       ) : null}
     </ScrollView>
   );

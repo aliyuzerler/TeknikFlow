@@ -1,6 +1,7 @@
 import type {
   CaptureSignatureRequest,
   ChecklistItemView,
+  ConsumePartRequest,
   SignatureStroke,
   WorkOrderStatus,
 } from '@teknikflow/contracts';
@@ -50,6 +51,8 @@ export interface ExecutionActions {
   startLabor(workOrderId: string, type?: 'TRAVEL' | 'LABOR'): Promise<ActionOutcome>;
   stopLabor(workOrderId: string, timeEntryId: string): Promise<ActionOutcome>;
   captureSignature(workOrderId: string, input: CaptureSignatureRequest): Promise<ActionOutcome>;
+  /** Faz 09 — parça tüketimi (kendi araç stoğu; sunucu atomik işler). */
+  consumePart(workOrderId: string, input: ConsumePartRequest): Promise<ActionOutcome>;
 }
 
 export function createExecutionActions(deps: ExecutionActionsDeps): ExecutionActions {
@@ -133,6 +136,10 @@ export function createExecutionActions(deps: ExecutionActionsDeps): ExecutionAct
 
     async captureSignature(workOrderId, input) {
       return enqueue(workOrderId, 'signature.capture', input satisfies CaptureSignatureRequest);
+    },
+
+    async consumePart(workOrderId, input) {
+      return enqueue(workOrderId, 'parts.consume', input satisfies ConsumePartRequest);
     },
   };
 }
