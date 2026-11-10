@@ -38,7 +38,10 @@ interface MovementRow {
   note: string | null;
 }
 
-const TONES: Record<MovementRow['movementType'], 'green' | 'amber' | 'blue' | 'gray' | 'red' | 'info'> = {
+const TONES: Record<
+  MovementRow['movementType'],
+  'green' | 'amber' | 'blue' | 'gray' | 'red' | 'info'
+> = {
   RECEIVE: 'green',
   ISSUE: 'blue',
   TRANSFER: 'blue',
@@ -87,7 +90,11 @@ const COLUMNS: Array<DataTableColumn<MovementRow>> = [
     key: 'ref',
     header: 'Referans',
     render: (row) =>
-      row.referenceType === 'work_order' ? 'İş emri' : row.referenceType === 'stock_count' ? 'Sayım' : '—',
+      row.referenceType === 'work_order'
+        ? 'İş emri'
+        : row.referenceType === 'stock_count'
+          ? 'Sayım'
+          : '—',
   },
 ];
 
@@ -156,7 +163,12 @@ export default async function InventoryMovementsPage({
           action="/app/inventory/movements"
           style={{ padding: '14px 18px 0', display: 'flex', gap: 8 }}
         >
-          <select name="type" defaultValue={type} aria-label="Hareket türü" style={{ maxWidth: 240 }}>
+          <select
+            name="type"
+            defaultValue={type}
+            aria-label="Hareket türü"
+            style={{ maxWidth: 240 }}
+          >
             <option value="">Tüm türler</option>
             {Object.entries(STOCK_MOVEMENT_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -173,7 +185,12 @@ export default async function InventoryMovementsPage({
             Filtreyle eşleşen hareket yok.
           </p>
         ) : (
-          <DataTable columns={COLUMNS} rows={body.data} getKey={(row) => row.movementId} aria-label="Stok hareketleri" />
+          <DataTable
+            columns={COLUMNS}
+            rows={body.data}
+            getKey={(row) => row.movementId}
+            aria-label="Stok hareketleri"
+          />
         )}
         <div style={{ padding: '0 18px 14px' }}>
           <Pager

@@ -7,7 +7,6 @@ import {
   CreateMovementRequestSchema,
   STOCK_MOVEMENT_TYPE_LABELS,
   type BalanceView,
-  type MovementView,
   type StockItemView,
   type WarehouseView,
 } from '@teknikflow/contracts';
@@ -51,12 +50,21 @@ export function NewMovementForm() {
     async function load() {
       const headers = { accept: 'application/json' };
       const [itemsRes, warehouseRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/v1/inventory/items?pageSize=100`, { headers, credentials: 'include', signal: AbortSignal.timeout(6000) }).catch(() => null),
-        fetch(`${apiBaseUrl}/api/v1/inventory/warehouses`, { headers, credentials: 'include', signal: AbortSignal.timeout(6000) }).catch(() => null),
+        fetch(`${apiBaseUrl}/api/v1/inventory/items?pageSize=100`, {
+          headers,
+          credentials: 'include',
+          signal: AbortSignal.timeout(6000),
+        }).catch(() => null),
+        fetch(`${apiBaseUrl}/api/v1/inventory/warehouses`, {
+          headers,
+          credentials: 'include',
+          signal: AbortSignal.timeout(6000),
+        }).catch(() => null),
       ]);
       if (cancelled) return;
       if (itemsRes?.ok) setItems(((await itemsRes.json()).data ?? []) as StockItemView[]);
-      if (warehouseRes?.ok) setWarehouses(((await warehouseRes.json()).data ?? []) as WarehouseView[]);
+      if (warehouseRes?.ok)
+        setWarehouses(((await warehouseRes.json()).data ?? []) as WarehouseView[]);
     }
     void load();
     return () => {
@@ -71,10 +79,11 @@ export function NewMovementForm() {
     if (!itemId) return;
     let cancelled = false;
     async function load() {
-      const response = await fetch(
-        `${apiBaseUrl}/api/v1/inventory/balances?itemId=${itemId}`,
-        { headers: { accept: 'application/json' }, credentials: 'include', signal: AbortSignal.timeout(6000) },
-      ).catch(() => null);
+      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/balances?itemId=${itemId}`, {
+        headers: { accept: 'application/json' },
+        credentials: 'include',
+        signal: AbortSignal.timeout(6000),
+      }).catch(() => null);
       if (!response?.ok) return;
       const body = (await response.json()) as { data?: BalanceView[] };
       if (!cancelled) setItemLots(body.data ?? []);
@@ -166,6 +175,8 @@ export function NewMovementForm() {
         message?: string;
         code?: string;
         details?: { available?: number };
+        quantity?: number;
+        unit?: string;
       };
       if (!response.ok) {
         if (body.code === 'NEGATIVE_STOCK_FORBIDDEN') {
@@ -179,9 +190,11 @@ export function NewMovementForm() {
         }
         return;
       }
-      const created = response.ok ? ((await response.json()) as MovementView) : null;
+      // Tek json okuma — gövde hem hata hem başarıda aynı değişkenden alınır.
       setSuccess(
-        `${STOCK_MOVEMENT_TYPE_LABELS[type]} kaydedildi${created ? ` (${created.quantity} ${created.unit})` : ''}.`,
+        `${STOCK_MOVEMENT_TYPE_LABELS[type]} kaydedildi${
+          response.ok && body.quantity !== undefined ? ` (${body.quantity} ${body.unit})` : ''
+        }.`,
       );
       setQuantity('');
       setNote('');
@@ -205,7 +218,12 @@ export function NewMovementForm() {
 
       <FormField label="Hareket türü" required>
         {(ids) => (
-          <select {...ids} name="type" value={type} onChange={(e) => setType(e.target.value as MovementType)}>
+          <select
+            {...ids}
+            name="type"
+            value={type}
+            onChange={(e) => setType(e.target.value as MovementType)}
+          >
             {TYPES.map((value) => (
               <option key={value} value={value}>
                 {STOCK_MOVEMENT_TYPE_LABELS[value]}
@@ -298,7 +316,15 @@ export function NewMovementForm() {
       </FormField>
 
       <FormField label="Not (opsiyonel)">
-        {(ids) => <input {...ids} name="note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />}
+        {(ids) => (
+          <input
+            {...ids}
+            name="note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+          />
+        )}
       </FormField>
 
       <Button type="submit" variant="primary" disabled={busy}>

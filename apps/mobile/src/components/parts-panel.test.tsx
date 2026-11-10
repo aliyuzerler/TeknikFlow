@@ -92,7 +92,7 @@ describe('PartsPanel (Faz 09)', () => {
     expect(screen.queryByTestId('parts-lots')).toBeNull();
   });
 
-  it("parti kalemi seçilince lot seçimi zorunludur; lot seçilince tüketim gönderilir", async () => {
+  it('parti kalemi seçilince lot seçimi zorunludur; lot seçilince tüketim gönderilir', async () => {
     const actions = makeActions(async () => ({ ok: true, queued: true, sent: true }));
     render(<PartsPanel order={WORK_ORDER} actions={actions} vanStock={VAN_STOCK} online />);
 
@@ -123,9 +123,7 @@ describe('PartsPanel (Faz 09)', () => {
 
   it("NONE kalemden tüketim lot'suz gönderilir (çevrimdışı → kuyruğa)", async () => {
     const actions = makeActions(async () => ({ ok: true, queued: true, sent: false }));
-    render(
-      <PartsPanel order={WORK_ORDER} actions={actions} vanStock={VAN_STOCK} online={false} />,
-    );
+    render(<PartsPanel order={WORK_ORDER} actions={actions} vanStock={VAN_STOCK} online={false} />);
     fireEvent.press(screen.getByTestId('parts-item-FLT-04-25'));
     fireEvent.changeText(screen.getByTestId('parts-qty'), '1.5');
     fireEvent.press(screen.getByTestId('parts-consume'));

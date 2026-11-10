@@ -2,7 +2,6 @@ import type { ApiError, AuthRequestContext } from './auth-client.js';
 import {
   BalanceListQuerySchema,
   BalanceListResponseSchema,
-  BalanceViewSchema,
   BinListResponseSchema,
   BinViewSchema,
   CloseStockCountRequestSchema,
@@ -69,8 +68,7 @@ import {
 type ParseOutcome<T> = { success: true; data: T } | { success: false };
 
 export type InventoryMutationResult<T> =
-  | { ok: true; data: T; replayed?: boolean }
-  | { ok: false; error: ApiError; replayed?: boolean };
+  { ok: true; data: T; replayed?: boolean } | { ok: false; error: ApiError; replayed?: boolean };
 
 async function inventoryRequest<T>(
   ctx: AuthRequestContext,
@@ -130,7 +128,9 @@ async function inventoryRequest<T>(
         message: envelope.message ?? `HTTP ${response.status}`,
         httpStatus: response.status,
         code: envelope.code,
-        ...(envelope.details ? { details: envelope.details as Record<string, string | number> } : {}),
+        ...(envelope.details
+          ? { details: envelope.details as Record<string, string | number> }
+          : {}),
       },
     };
   }
@@ -212,7 +212,9 @@ export async function createStockItem(
 export async function listStockItems(
   ctx: AuthRequestContext,
   query: StockItemListQuery = { page: 1, pageSize: 50 },
-): Promise<InventoryMutationResult<{ data: StockItemView[]; total: number; page: number; pageSize: number }>> {
+): Promise<
+  InventoryMutationResult<{ data: StockItemView[]; total: number; page: number; pageSize: number }>
+> {
   const parsedQuery = StockItemListQuerySchema.safeParse(query);
   if (!parsedQuery.success) {
     return {
@@ -339,7 +341,9 @@ export async function createMovement(
 export async function listMovements(
   ctx: AuthRequestContext,
   query: MovementListQuery = { page: 1, pageSize: 100 },
-): Promise<InventoryMutationResult<{ data: MovementView[]; total: number; page: number; pageSize: number }>> {
+): Promise<
+  InventoryMutationResult<{ data: MovementView[]; total: number; page: number; pageSize: number }>
+> {
   const parsedQuery = MovementListQuerySchema.safeParse(query);
   if (!parsedQuery.success) {
     return {
@@ -501,13 +505,8 @@ export async function createStockCount(
 export async function listStockCounts(
   ctx: AuthRequestContext,
 ): Promise<InventoryMutationResult<{ data: StockCountView[] }>> {
-  return inventoryRequest(
-    ctx,
-    'GET',
-    '/api/v1/inventory/counts',
-    undefined,
-    undefined,
-    (data) => parseWith(StockCountListResponseSchema, data),
+  return inventoryRequest(ctx, 'GET', '/api/v1/inventory/counts', undefined, undefined, (data) =>
+    parseWith(StockCountListResponseSchema, data),
   );
 }
 

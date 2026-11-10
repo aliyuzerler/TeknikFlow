@@ -13,11 +13,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Varsayilan: Story = {
+  args: { value: '1', label: 'Tüketilen miktar', onChange: () => undefined },
   render: () => {
     const [value, setValue] = useState('1');
     return (
       <FormField label="Tüketilen miktar" hint="En çok 4 ondalık">
-        {() => <QuantityInput label="Tüketilen miktar" unit="ad" value={value} onChange={setValue} />}
+        {() => (
+          <QuantityInput label="Tüketilen miktar" unit="ad" value={value} onChange={setValue} />
+        )}
       </FormField>
     );
   },
@@ -31,6 +34,7 @@ export const Varsayilan: Story = {
 };
 
 export const AdimDugmeleri: Story = {
+  args: { value: '3', label: 'Sayılan miktar', onChange: () => undefined },
   render: () => {
     const [value, setValue] = useState('3');
     return (
@@ -51,8 +55,9 @@ export const AdimDugmeleri: Story = {
 };
 
 export const GecersizVeDevreDisi: Story = {
+  args: { value: '', label: 'Stok aşımı', onChange: () => undefined },
   render: () => {
-    const [value, setValue] = useState('');
+    const [, setValue] = useState('');
     return (
       <div style={{ display: 'grid', gap: 16 }}>
         <FormField label="Stok aşımı" error="Miktar kullanılabilir bakiyeyi aşıyor">
@@ -82,13 +87,12 @@ export const GecersizVeDevreDisi: Story = {
 };
 
 export const OndalikSiniri: Story = {
+  args: { value: '', label: 'Ondalık sınırı', onChange: () => undefined },
   render: () => {
     const [value, setValue] = useState('');
     return (
       <FormField label="Ondalık sınırı" hint="5. basamak kabul edilmez (0.0001 adım)">
-        {() => (
-          <QuantityInput label="Ondalık sınırı" unit="m" value={value} onChange={setValue} />
-        )}
+        {() => <QuantityInput label="Ondalık sınırı" unit="m" value={value} onChange={setValue} />}
       </FormField>
     );
   },

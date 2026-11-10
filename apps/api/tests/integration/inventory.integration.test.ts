@@ -171,8 +171,12 @@ async function balanceOf(
   const response = await authed(cookies)
     .get(`/api/v1/inventory/balances?warehouseId=${warehouseId}&itemId=${itemId}`)
     .expect(200);
-  const rows: Array<{ onHand: number; reservedQty: number; available: number; lotId: string | null }> =
-    response.body.data ?? [];
+  const rows: Array<{
+    onHand: number;
+    reservedQty: number;
+    available: number;
+    lotId: string | null;
+  }> = response.body.data ?? [];
   const onHand = rows.reduce((sum, row) => sum + row.onHand, 0);
   const reservedQty = rows.reduce((sum, row) => sum + row.reservedQty, 0);
   return { onHand, reservedQty, available: rows[0]?.available ?? 0, lotRows: rows.length };
@@ -798,8 +802,7 @@ describe('Sayım (cycle count) — onaylı düzeltme', () => {
 
 describe('Çapraz kiracı stok reddi — RLS savunma derinliği', () => {
   it("B sahibi A'nın kalemini göremez (404 — varlık sızmıyor)", async () => {
-    const response = await authed(tenantB.cookies)
-      .get(`/api/v1/inventory/items/${itemNoneId}`);
+    const response = await authed(tenantB.cookies).get(`/api/v1/inventory/items/${itemNoneId}`);
     expect(response.status).toBe(404);
     expect(response.body.code).toBe('NOT_FOUND');
   });
@@ -818,9 +821,7 @@ describe('Çapraz kiracı stok reddi — RLS savunma derinliği', () => {
   });
 
   it("B'nin bakiye listesinde A'nın SKU'su ASLA görünmez", async () => {
-    const response = await authed(tenantB.cookies)
-      .get('/api/v1/inventory/balances')
-      .expect(200);
+    const response = await authed(tenantB.cookies).get('/api/v1/inventory/balances').expect(200);
     const rows: Array<{ sku: string }> = response.body.data ?? [];
     expect(rows.some((row) => row.sku === 'FLT-04-25')).toBe(false);
   });

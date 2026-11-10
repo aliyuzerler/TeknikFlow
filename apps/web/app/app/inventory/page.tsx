@@ -53,7 +53,10 @@ const MOVEMENT_LABELS: Record<MovementRow['movementType'], string> = {
   ADJUSTMENT: 'Sayım düzeltmesi',
 };
 
-const MOVEMENT_TONES: Record<MovementRow['movementType'], 'green' | 'amber' | 'blue' | 'gray' | 'red' | 'info'> = {
+const MOVEMENT_TONES: Record<
+  MovementRow['movementType'],
+  'green' | 'amber' | 'blue' | 'gray' | 'red' | 'info'
+> = {
   RECEIVE: 'green',
   ISSUE: 'blue',
   TRANSFER: 'blue',
@@ -187,7 +190,12 @@ export default async function InventoryOverviewPage() {
           marginBottom: 16,
         }}
       >
-        <MetricCard label="Stok kalemi" value={itemCount} tone="blue" note="Katalogda kayıtlı SKU" />
+        <MetricCard
+          label="Stok kalemi"
+          value={itemCount}
+          tone="blue"
+          note="Katalogda kayıtlı SKU"
+        />
         <MetricCard
           label="Düşük stok satırı"
           value={lowStockRows.length}

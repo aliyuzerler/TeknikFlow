@@ -78,7 +78,14 @@ const MOVEMENT_INCLUDE = {
 
 const BALANCE_INCLUDE = {
   stockItem: {
-    select: { sku: true, name: true, unit: true, trackingMode: true, reorderPoint: true, active: true },
+    select: {
+      sku: true,
+      name: true,
+      unit: true,
+      trackingMode: true,
+      reorderPoint: true,
+      active: true,
+    },
   },
   warehouse: { select: { name: true, type: true } },
   lot: { select: { lotNo: true, expiresAt: true } },
@@ -234,7 +241,9 @@ export class InventoryService {
           _sum: { onHand: true },
         }),
       ]);
-      const sumMap = new Map(sums.map((s) => [s.stockItemId, qtyToView(Number(s._sum.onHand ?? 0))]));
+      const sumMap = new Map(
+        sums.map((s) => [s.stockItemId, qtyToView(Number(s._sum.onHand ?? 0))]),
+      );
       let views = rows.map((item) => toStockItemView(item, sumMap.get(item.id) ?? 0));
       if (query.lowStock === 'true') views = views.filter((view) => view.lowStock);
       return { data: views, total, page: query.page, pageSize: query.pageSize };
@@ -443,10 +452,7 @@ export class InventoryService {
         ...(query.referenceId ? { referenceId: query.referenceId } : {}),
         ...(query.warehouseId
           ? {
-              OR: [
-                { fromWarehouseId: query.warehouseId },
-                { toWarehouseId: query.warehouseId },
-              ],
+              OR: [{ fromWarehouseId: query.warehouseId }, { toWarehouseId: query.warehouseId }],
             }
           : {}),
       };
@@ -630,7 +636,9 @@ export class InventoryService {
         });
       }
 
-      const remaining = qtyToView(Number(reservation.reservedQty) - Number(reservation.consumedQty));
+      const remaining = qtyToView(
+        Number(reservation.reservedQty) - Number(reservation.consumedQty),
+      );
       const locked = await lockBalance(
         tx,
         tenantId,
@@ -962,7 +970,6 @@ export class InventoryService {
     return this.applyMovement(tx, tenantId, actorId, { ...params, type: 'CONSUME' });
   }
 
-
   /**
    * Hareket + bakiye güncellemesi TEK transaction'da (çağrı zaten
    * kiracı transaction'ının içindedir). Yarışta movementKey tekil
@@ -985,14 +992,13 @@ export class InventoryService {
     }
 
     // 2) Kalem + lot kuralları.
-    const item = await requireItem(
-      tx,
-      tenantId,
-      params.itemId,
-      params.type !== 'ADJUSTMENT',
-    );
+    const item = await requireItem(tx, tenantId, params.itemId, params.type !== 'ADJUSTMENT');
     const lot = await requireLotIfTracked(tx, tenantId, item, params.lotId);
-    if (params.type === 'CONSUME' && item.trackingMode === 'SERIAL' && !Number.isInteger(params.quantity)) {
+    if (
+      params.type === 'CONSUME' &&
+      item.trackingMode === 'SERIAL' &&
+      !Number.isInteger(params.quantity)
+    ) {
       throw new ConflictException({
         message: 'Seri izlenen kalemde miktar tam sayı olmalı (1 lot = 1 adet)',
         code: 'SERIAL_QUANTITY_INVALID',
@@ -1223,9 +1229,7 @@ async function lockBalance(
   stockItemId: string,
   lotId: string | null,
 ): Promise<{ id: string; onHand: number; reservedQty: number } | null> {
-  const rows = await tx.$queryRaw<
-    Array<{ id: string; onHand: number; reservedQty: number }>
-  >(
+  const rows = await tx.$queryRaw<Array<{ id: string; onHand: number; reservedQty: number }>>(
     Prisma.sql`SELECT "id", "onHand"::float8 AS "onHand", "reservedQty"::float8 AS "reservedQty"
       FROM "stock_balances"
       WHERE "tenantId" = ${tenantId} AND "warehouseId" = ${warehouseId}

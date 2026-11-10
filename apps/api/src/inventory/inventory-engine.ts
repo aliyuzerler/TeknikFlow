@@ -14,12 +14,7 @@
  */
 
 export type StockMovementType =
-  | 'RECEIVE'
-  | 'ISSUE'
-  | 'TRANSFER'
-  | 'RETURN'
-  | 'CONSUME'
-  | 'ADJUSTMENT';
+  'RECEIVE' | 'ISSUE' | 'TRANSFER' | 'RETURN' | 'CONSUME' | 'ADJUSTMENT';
 
 export interface MovementDeltas {
   /** Kaynak depo değişimi (negatif ya da 0). */
@@ -122,10 +117,7 @@ export function exceedsReservation(
  * Maliyet dondurma — tüketim anındaki lot birim maliyeti ile toplam
  * kuruş hesabı. Miktar ≤4 ondalık; sonuç en yakın kuruşa yuvarlanır.
  */
-export function consumeCostMinor(
-  quantity: number,
-  unitCostMinor: number | null,
-): number | null {
+export function consumeCostMinor(quantity: number, unitCostMinor: number | null): number | null {
   if (unitCostMinor === null) return null;
   return Math.round(quantity * unitCostMinor);
 }
@@ -175,13 +167,9 @@ export function validateMovementShape(
 ): string | null {
   switch (type) {
     case 'RECEIVE':
-      return toWarehouseId && !fromWarehouseId
-        ? null
-        : 'RECEIVE yalnız toWarehouse ile yapılır';
+      return toWarehouseId && !fromWarehouseId ? null : 'RECEIVE yalnız toWarehouse ile yapılır';
     case 'CONSUME':
-      return fromWarehouseId && !toWarehouseId
-        ? null
-        : 'CONSUME yalnız fromWarehouse ile yapılır';
+      return fromWarehouseId && !toWarehouseId ? null : 'CONSUME yalnız fromWarehouse ile yapılır';
     case 'ISSUE':
     case 'TRANSFER':
     case 'RETURN':

@@ -28,11 +28,7 @@ import {
   UpdateStockItemRequestSchema,
 } from '@teknikflow/contracts';
 import { AuthGuard } from '../auth/auth.guard.js';
-import {
-  CurrentAuth,
-  RequireAnyPermissions,
-  RequirePermissions,
-} from '../auth/auth.decorators.js';
+import { CurrentAuth, RequireAnyPermissions, RequirePermissions } from '../auth/auth.decorators.js';
 import { PermissionsGuard } from '../rbac/permissions.guard.js';
 import type { RequestAuthContext } from '../auth/auth-context.js';
 import { InventoryService } from './inventory.service.js';
@@ -145,11 +141,7 @@ export class InventoryController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const input = CreateMovementRequestSchema.parse(body ?? {});
-    const outcome = await this.inventory.createMovement(
-      requireTenant(ctx),
-      input,
-      actor(ctx, req),
-    );
+    const outcome = await this.inventory.createMovement(requireTenant(ctx), input, actor(ctx, req));
     if (outcome.replayed) res.setHeader('x-idempotent-replay', 'true');
     return outcome.body;
   }
@@ -233,10 +225,7 @@ export class InventoryController {
 
   @Get('counts/:countId/lines')
   @RequirePermissions('stock:view')
-  async listCountLines(
-    @Param('countId') countId: string,
-    @CurrentAuth() ctx: RequestAuthContext,
-  ) {
+  async listCountLines(@Param('countId') countId: string, @CurrentAuth() ctx: RequestAuthContext) {
     return this.inventory.listCountLines(requireTenant(ctx), countId);
   }
 

@@ -404,10 +404,7 @@ export class ExecutionService {
         },
       });
       const parts = partRows.map(toPartConsumptionView);
-      const partsCostMinor = parts.reduce(
-        (sum, part) => sum + (part.totalCostMinor ?? 0),
-        0,
-      );
+      const partsCostMinor = parts.reduce((sum, part) => sum + (part.totalCostMinor ?? 0), 0);
 
       const labor: LaborSummary = computeLaborSummary(
         workOrder.timeEntries.map((entry) => ({

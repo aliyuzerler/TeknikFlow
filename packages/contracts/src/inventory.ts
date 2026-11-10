@@ -255,9 +255,7 @@ export const CreateMovementRequestSchema = z
             value.fromWarehouseId !== value.toWarehouseId
           );
         case 'ADJUSTMENT':
-          return (
-            (value.fromWarehouseId !== undefined) !== (value.toWarehouseId !== undefined)
-          );
+          return (value.fromWarehouseId !== undefined) !== (value.toWarehouseId !== undefined);
       }
     },
     {

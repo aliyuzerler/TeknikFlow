@@ -10,16 +10,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import {
-  ConsumePartRequestSchema,
-  EXECUTION_IDEMPOTENCY_HEADER,
-} from '@teknikflow/contracts';
+import { ConsumePartRequestSchema, EXECUTION_IDEMPOTENCY_HEADER } from '@teknikflow/contracts';
 import { AuthGuard } from '../auth/auth.guard.js';
-import {
-  CurrentAuth,
-  RequireAnyPermissions,
-  RequirePermissions,
-} from '../auth/auth.decorators.js';
+import { CurrentAuth, RequireAnyPermissions, RequirePermissions } from '../auth/auth.decorators.js';
 import { PermissionsGuard } from '../rbac/permissions.guard.js';
 import type { RequestAuthContext } from '../auth/auth-context.js';
 import { WorkOrderPartsService } from './work-order-parts.service.js';

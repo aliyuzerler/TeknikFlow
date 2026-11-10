@@ -243,7 +243,11 @@ export function PartsPanel({ workOrderId, status, permissions, isAssignee }: Par
           <h3 className="tf-panel__title" style={{ fontSize: 15 }}>
             Parça tüket
           </h3>
-          <FormField label="Stok kalemi" required hint="Yalnız kullanılabilir stokta olanlar listelenir">
+          <FormField
+            label="Stok kalemi"
+            required
+            hint="Yalnız kullanılabilir stokta olanlar listelenir"
+          >
             {(ids) => (
               <select
                 {...ids}

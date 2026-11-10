@@ -5,9 +5,7 @@ import { QuantityInput } from './quantity-input.js';
 
 describe('QuantityInput', () => {
   it('değer ve birim gösterilir; erişilebilir etiket bağlanır', () => {
-    render(
-      <QuantityInput label="Tüketilen miktar" unit="ad" value="2.5" onChange={() => {}} />,
-    );
+    render(<QuantityInput label="Tüketilen miktar" unit="ad" value="2.5" onChange={() => {}} />);
     const input = screen.getByRole('textbox', { name: 'Tüketilen miktar' });
     expect(input).toHaveValue('2.5');
     expect(screen.getByText('ad')).toBeInTheDocument();

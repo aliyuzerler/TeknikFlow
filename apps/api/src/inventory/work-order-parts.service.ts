@@ -6,12 +6,8 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import type {
-  ConsumePartRequest,
-  PartConsumptionView,
-} from '@teknikflow/contracts';
+import type { ConsumePartRequest, PartConsumptionView } from '@teknikflow/contracts';
 import { AuditService } from '../audit/audit.service.js';
-import type { ScopedClient } from '../common/tenant-scoped-prisma.js';
 import { TenantScopedPrismaService } from '../common/tenant-scoped-prisma.js';
 import { IdempotencyService, type IdempotencyOutcome } from '../execution/idempotency.service.js';
 import { toPartConsumptionView } from './inventory-views.js';
@@ -147,8 +143,7 @@ export class WorkOrderPartsService {
           });
           if (!van) {
             throw new ConflictException({
-              message:
-                'Tüketim deposu belirlenemedi — size bağlı araç deposu yok, depo belirtin',
+              message: 'Tüketim deposu belirlenemedi — size bağlı araç deposu yok, depo belirtin',
               code: 'VAN_WAREHOUSE_MISSING',
             });
           }
@@ -160,8 +155,7 @@ export class WorkOrderPartsService {
             select: { id: true, type: true, assignedToId: true },
           });
           if (!warehouse) throw notFound('Depo bulunamadı');
-          const ownVan =
-            warehouse.type === 'VEHICLE' && warehouse.assignedToId === actor.userId;
+          const ownVan = warehouse.type === 'VEHICLE' && warehouse.assignedToId === actor.userId;
           if (!ownVan) throw forbidden();
         }
 

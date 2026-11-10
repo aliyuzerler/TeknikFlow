@@ -211,10 +211,13 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
 
     // ---- Faz 06: dispatch demo (çalışma saatleri, izin, yetenek, takım) ----
     await seedDemoDispatch(tx, tenant.id, ownerUserId ?? '');
+
+    // ---- Faz 09: stok demo (depolar, katalog, lot/seri, giriş + araç çıkışı) ----
+    await seedDemoInventory(tx, tenant.id);
   });
 
   console.log(
-    `[seed] Demo kiracı 'atlas-teknik-servis': 2 şube, 8 kullanıcı + demo CRM (parola: DEMO_SEED_PASSWORD)`,
+    `[seed] Demo kiracı 'atlas-teknik-servis': 2 şube, 8 kullanıcı + demo CRM + stok (parola: DEMO_SEED_PASSWORD)`,
   );
 }
 
@@ -1319,4 +1322,222 @@ async function seedDemoDispatch(
   console.log(
     `[seed] Faz 06 demo: ${skills.length} yetenek, 3 profil + çalışma saati, 1 izin, 2 takım`,
   );
+}
+
+/**
+ * Faz 09 — stok demo verisi (docs/DEMO_SEED_DATA.md — kurgusal):
+ * merkez depo + teknisyen aracı, 3 kalem (toplu/parti/seri), lot'lar,
+ * merkez girişleri ve araç çıkışı. movementKey'ler deterministiktir —
+ * tekrar seed'te çift hareket oluşmaz; bakiyeler defterle uyumlu kalır.
+ */
+async function seedDemoInventory(tx: Prisma.TransactionClient, tenantId: string): Promise<void> {
+  const tech1 = await tx.user.findFirstOrThrow({
+    where: { emailNormalized: 'technician1@atlas.example.test' },
+  });
+  const warehouseUser = await tx.user.findFirstOrThrow({
+    where: { emailNormalized: 'warehouse@atlas.example.test' },
+  });
+
+  const central = await tx.warehouse.upsert({
+    where: { tenantId_name: { tenantId, name: 'Atlas Merkez Depo' } },
+    create: { tenantId, name: 'Atlas Merkez Depo', type: 'CENTRAL' },
+    update: {},
+  });
+  const van = await tx.warehouse.upsert({
+    where: { tenantId_name: { tenantId, name: 'Emre Yılmaz Aracı' } },
+    create: { tenantId, name: 'Emre Yılmaz Aracı', type: 'VEHICLE', assignedToId: tech1.id },
+    update: { assignedToId: tech1.id },
+  });
+
+  await tx.stockBin.upsert({
+    where: { warehouseId_code: { warehouseId: central.id, code: 'A-01' } },
+    create: { tenantId, warehouseId: central.id, code: 'A-01', note: 'Filtre rafı' },
+    update: {},
+  });
+
+  const items = [
+    {
+      sku: 'FLT-04-25',
+      name: 'Hava filtresi 04-25',
+      unit: 'ad',
+      trackingMode: 'NONE' as const,
+      reorderPoint: 5,
+    },
+    {
+      sku: 'GLY-5W-1L',
+      name: 'Glikol 5W 1L',
+      unit: 'lt',
+      trackingMode: 'LOT' as const,
+      reorderPoint: 2,
+    },
+    {
+      sku: 'PUMP-SERI',
+      name: 'Dalgıç pompa P-100 (seri izlemeli)',
+      unit: 'ad',
+      trackingMode: 'SERIAL' as const,
+      reorderPoint: 0,
+    },
+  ];
+  const itemIdBySku = new Map<string, string>();
+  for (const spec of items) {
+    const item = await tx.stockItem.upsert({
+      where: { tenantId_sku: { tenantId, sku: spec.sku } },
+      create: { tenantId, ...spec },
+      update: { name: spec.name, unit: spec.unit, reorderPoint: spec.reorderPoint },
+    });
+    itemIdBySku.set(spec.sku, item.id);
+  }
+
+  // Parti/seri lotları (maliyetler kuruş; E2E maliyet doğrulaması bunlara bakar).
+  const glyItemId = itemIdBySku.get('GLY-5W-1L') ?? '';
+  const pumpItemId = itemIdBySku.get('PUMP-SERI') ?? '';
+  const glyLot = await tx.stockLot.upsert({
+    where: { stockItemId_lotNo: { stockItemId: glyItemId, lotNo: 'LOT-2026-11-A' } },
+    create: {
+      tenantId,
+      stockItemId: glyItemId,
+      lotNo: 'LOT-2026-11-A',
+      costMinor: 1250,
+      expiresAt: new Date('2027-06-01T00:00:00.000Z'),
+    },
+    update: { costMinor: 1250 },
+  });
+  const pumpLot = await tx.stockLot.upsert({
+    where: { stockItemId_lotNo: { stockItemId: pumpItemId, lotNo: 'SN-2026-000001' } },
+    create: {
+      tenantId,
+      stockItemId: pumpItemId,
+      lotNo: 'SN-2026-000001',
+      serialNo: 'SN-2026-000001',
+      costMinor: 480000,
+    },
+    update: { costMinor: 480000 },
+  });
+
+  // Hareket + bakiye (deterministik movementKey; tekrar seed'te çift yazım yok).
+  const movementSpecs = [
+    {
+      key: '9f000000-0000-4000-8000-000000000001',
+      sku: 'FLT-04-25',
+      type: 'RECEIVE' as const,
+      quantity: 50,
+      lotId: null as string | null,
+      fromWarehouseId: null as string | null,
+      toWarehouseId: central.id,
+      unitCostMinor: null as number | null,
+    },
+    {
+      key: '9f000000-0000-4000-8000-000000000002',
+      sku: 'GLY-5W-1L',
+      type: 'RECEIVE' as const,
+      quantity: 12,
+      lotId: glyLot.id,
+      fromWarehouseId: null,
+      toWarehouseId: central.id,
+      unitCostMinor: null,
+    },
+    {
+      key: '9f000000-0000-4000-8000-000000000003',
+      sku: 'PUMP-SERI',
+      type: 'RECEIVE' as const,
+      quantity: 1,
+      lotId: pumpLot.id,
+      fromWarehouseId: null,
+      toWarehouseId: van.id,
+      unitCostMinor: null,
+    },
+    {
+      key: '9f000000-0000-4000-8000-000000000004',
+      sku: 'FLT-04-25',
+      type: 'ISSUE' as const,
+      quantity: 10,
+      lotId: null,
+      fromWarehouseId: central.id,
+      toWarehouseId: van.id,
+      unitCostMinor: null,
+    },
+    {
+      key: '9f000000-0000-4000-8000-000000000005',
+      sku: 'GLY-5W-1L',
+      type: 'ISSUE' as const,
+      quantity: 4,
+      lotId: glyLot.id,
+      fromWarehouseId: central.id,
+      toWarehouseId: van.id,
+      unitCostMinor: null,
+    },
+  ];
+
+  const deltaFor = (
+    type: 'RECEIVE' | 'ISSUE',
+    quantity: number,
+  ): { globalDelta: number; perWarehouse: number } => ({
+    globalDelta: type === 'RECEIVE' ? quantity : 0,
+    perWarehouse: quantity,
+  });
+
+  for (const spec of movementSpecs) {
+    const itemId = itemIdBySku.get(spec.sku) ?? '';
+    const existing = await tx.stockMovement.findFirst({
+      where: { tenantId, movementKey: spec.key },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    const { globalDelta } = deltaFor(spec.type, spec.quantity);
+    await tx.stockMovement.create({
+      data: {
+        tenantId,
+        stockItemId: itemId,
+        lotId: spec.lotId,
+        fromWarehouseId: spec.fromWarehouseId,
+        toWarehouseId: spec.toWarehouseId,
+        movementType: spec.type,
+        quantity: spec.quantity,
+        quantityDelta: globalDelta,
+        movementKey: spec.key,
+        unitCostMinor: spec.unitCostMinor,
+        actorId: warehouseUser.id,
+        note: 'Demo tohum verisi',
+      },
+    });
+
+    // Bakiye güncelle (IN tarafı; ISSUE iki tarafa dokunur).
+    const targets: Array<{ warehouseId: string; delta: number }> = [];
+    if (spec.type === 'RECEIVE')
+      targets.push({ warehouseId: spec.toWarehouseId ?? '', delta: spec.quantity });
+    if (spec.type === 'ISSUE') {
+      targets.push({ warehouseId: spec.fromWarehouseId ?? '', delta: -spec.quantity });
+      targets.push({ warehouseId: spec.toWarehouseId ?? '', delta: spec.quantity });
+    }
+    for (const target of targets) {
+      const balance = await tx.stockBalance.findFirst({
+        where: {
+          tenantId,
+          warehouseId: target.warehouseId,
+          stockItemId: itemId,
+          lotId: spec.lotId,
+        },
+      });
+      if (balance) {
+        await tx.stockBalance.update({
+          where: { id: balance.id },
+          data: { onHand: Number(balance.onHand) + target.delta },
+        });
+      } else {
+        await tx.stockBalance.create({
+          data: {
+            tenantId,
+            warehouseId: target.warehouseId,
+            stockItemId: itemId,
+            lotId: spec.lotId,
+            onHand: target.delta,
+            reservedQty: 0,
+          },
+        });
+      }
+    }
+  }
+
+  console.log('[seed] Faz 09 demo: 2 depo, 3 kalem (toplu/parti/seri), 5 hareket');
 }

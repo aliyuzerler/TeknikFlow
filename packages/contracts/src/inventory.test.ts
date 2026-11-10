@@ -89,9 +89,7 @@ describe('CreateMovementRequestSchema — yön kuralları', () => {
         fromWarehouseId: uid(4),
       }).success,
     ).toBe(false);
-    expect(CreateMovementRequestSchema.safeParse({ ...base, type: 'RECEIVE' }).success).toBe(
-      false,
-    );
+    expect(CreateMovementRequestSchema.safeParse({ ...base, type: 'RECEIVE' }).success).toBe(false);
   });
 
   it('TRANSFER: from + to zorunlu ve farklı olmalı', () => {
@@ -120,8 +118,11 @@ describe('CreateMovementRequestSchema — yön kuralları', () => {
         .success,
     ).toBe(true);
     expect(
-      CreateMovementRequestSchema.safeParse({ ...base, type: 'ADJUSTMENT', fromWarehouseId: uid(3) })
-        .success,
+      CreateMovementRequestSchema.safeParse({
+        ...base,
+        type: 'ADJUSTMENT',
+        fromWarehouseId: uid(3),
+      }).success,
     ).toBe(true);
     expect(CreateMovementRequestSchema.safeParse({ ...base, type: 'ADJUSTMENT' }).success).toBe(
       false,
@@ -216,20 +217,20 @@ describe('ConsumePartRequestSchema', () => {
   });
 
   it('miktar sınırı uygulanır', () => {
-    expect(
-      ConsumePartRequestSchema.safeParse({ itemId: uid(2), quantity: -1 }).success,
-    ).toBe(false);
+    expect(ConsumePartRequestSchema.safeParse({ itemId: uid(2), quantity: -1 }).success).toBe(
+      false,
+    );
   });
 });
 
 describe('SubmitCountLineRequestSchema', () => {
   it('sayılan miktar 0 olabilir (boş raf) — negatif olamaz', () => {
-    expect(
-      SubmitCountLineRequestSchema.safeParse({ itemId: uid(2), countedQty: 0 }).success,
-    ).toBe(true);
-    expect(
-      SubmitCountLineRequestSchema.safeParse({ itemId: uid(2), countedQty: -2 }).success,
-    ).toBe(false);
+    expect(SubmitCountLineRequestSchema.safeParse({ itemId: uid(2), countedQty: 0 }).success).toBe(
+      true,
+    );
+    expect(SubmitCountLineRequestSchema.safeParse({ itemId: uid(2), countedQty: -2 }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -257,7 +258,13 @@ describe('ExecutionReportView — parça alanları (Faz 09 eklemesi)', () => {
     startedAt: null,
     completedAt: null,
     closedAt: null,
-    labor: { totalMinutes: 0, travelMinutes: 0, laborMinutes: 0, waitingMinutes: 0, openEntry: false },
+    labor: {
+      totalMinutes: 0,
+      travelMinutes: 0,
+      laborMinutes: 0,
+      waitingMinutes: 0,
+      openEntry: false,
+    },
     visits: [],
     checklist: [],
     timeEntries: [],
@@ -302,8 +309,8 @@ describe('ExecutionReportView — parça alanları (Faz 09 eklemesi)', () => {
   });
 
   it('partsCostMinor negatif olamaz', () => {
-    expect(
-      ExecutionReportViewSchema.safeParse({ ...report, partsCostMinor: -1 }).success,
-    ).toBe(false);
+    expect(ExecutionReportViewSchema.safeParse({ ...report, partsCostMinor: -1 }).success).toBe(
+      false,
+    );
   });
 });

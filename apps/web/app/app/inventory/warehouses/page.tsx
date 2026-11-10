@@ -28,12 +28,18 @@ interface WarehouseRow {
 }
 
 const COLUMNS: Array<DataTableColumn<WarehouseRow>> = [
-  { key: 'name', header: 'Depo', render: (row) => <span className="tf-table__wo">{row.name}</span> },
+  {
+    key: 'name',
+    header: 'Depo',
+    render: (row) => <span className="tf-table__wo">{row.name}</span>,
+  },
   {
     key: 'type',
     header: 'Tür',
     render: (row) => (
-      <StatusBadge tone={row.type === 'VEHICLE' ? 'info' : row.type === 'BRANCH' ? 'blue' : 'green'}>
+      <StatusBadge
+        tone={row.type === 'VEHICLE' ? 'info' : row.type === 'BRANCH' ? 'blue' : 'green'}
+      >
         {WAREHOUSE_TYPE_LABELS[row.type]}
       </StatusBadge>
     ),
@@ -99,7 +105,12 @@ export default async function InventoryWarehousesPage() {
             Henüz depo yok — aşağıdan merkez depo veya araç stoğu tanımlayın.
           </p>
         ) : (
-          <DataTable columns={COLUMNS} rows={body.data} getKey={(row) => row.warehouseId} aria-label="Depo listesi" />
+          <DataTable
+            columns={COLUMNS}
+            rows={body.data}
+            getKey={(row) => row.warehouseId}
+            aria-label="Depo listesi"
+          />
         )}
         {canManage ? <NewWarehouseForm /> : null}
       </Panel>

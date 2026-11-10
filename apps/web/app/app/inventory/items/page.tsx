@@ -155,7 +155,12 @@ export default async function InventoryItemsPage({
             {q ? `"${q}" aramasıyla eşleşen kalem yok.` : 'Henüz stok kalemi yok.'}
           </p>
         ) : (
-          <DataTable columns={COLUMNS} rows={body.data} getKey={(row) => row.itemId} aria-label="Stok kataloğu" />
+          <DataTable
+            columns={COLUMNS}
+            rows={body.data}
+            getKey={(row) => row.itemId}
+            aria-label="Stok kataloğu"
+          />
         )}
         {canManage ? <NewItemForm /> : null}
       </Panel>

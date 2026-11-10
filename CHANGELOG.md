@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.0 — Phase 09: Inventory, van stock and parts consumption
+
+- Stok çekirdeği (ADR-0011): append-only `stock_movements` defteri (RECEIVE/ISSUE/TRANSFER/RETURN/CONSUME/ADJUSTMENT; işaretli `quantityDelta`) + transactional `stock_balances` (depo × kalem × lot; `available = onHand − reservedQty`). Bakiye hareketle AYNI transaction'da; OUT tarafı `SELECT … FOR UPDATE` kilitli.
+- Çift hareket engeli iki katman: istemci `movementKey` (kiracı başına tekil — yarış kaybedeni tüm transaction ile geri alınır, kazanan oynatılır `x-idempotent-replay: true`) + Faz 08 `x-idempotency-key` (iş emri parça ucunda aynı UUID iki amaca hizmet eder).
+- Negatif stok onaysız olamaz: serbest bakiye yetersiz → 409 `NEGATIVE_STOCK_FORBIDDEN` + `details.available/requested`. Onaylı tek negatif yol sayım kapanışı ADJUSTMENT (stock:manage + audit); `stock:manage_limited` (planlamacı) düzeltme yazamaz.
+- Katalog/depolar: SKU (kiracı tekil), NONE/LOT/SERIAL izleme, yeniden sipariş eşiği + düşük stok uyarısı; CENTRAL/BRANCH/VEHICLE depolar (araç deposu teknisyene bağlanır — `stock:issue_own` kaynağı), raf kodları; parti/seri (`expiresAt`, `costMinor`) — süresi geçen lot tüketime kapalı (`LOT_EXPIRED`), SERIAL tam sayı miktar (`SERIAL_QUANTITY_INVALID`).
+- İş emri parça tüketimi — ATOMİK: CONSUME genel hareket ucunda sözleşmeyle YASAK; tek yol `POST /work-orders/:id/parts` (hareket + bakiye + rezervasyon + `work_order.part_consumed` olayı + audit tek transaction). Teknisyen kendi aracından (van otomatik çözüm), `stock:manage` ile seçilen depodan; rezervasyon içi tüketim kilidi düşürür.
+- Rezervasyonlar: iş emri için stok kilidi (available düşer), serbest bırakma idempotent, tüketim durum makinesi (ACTIVE → PARTIALLY_CONSUMED → CONSUMED; RELEASED geri alma).
+- Sayım (cycle count): OPEN sayım (depoda tek), satırlarda beklenen sunucuda dondurulur, ikinci gönderim günceller; CLOSE farklar için ADJUSTMENT'ları tek transaction'da üretir (negatif fark onaylı yol).
+- Yürütme raporu genişletildi: `parts[]` + `partsCostMinor` (lot maliyetinden donan kuruş toplam) — web raporunda parça tablosu ve toplam satırı.
+- Web: `/app/inventory` (genel bakış, katalog, depolar, hareket defteri — filtre/sayfalama), oluşturma formları (hareket formu sözleşme şemasıyla istemci doğrular, negatif stok hatası dürüst `available` gösterir), iş emri detayında Parçalar paneli (tüketim listesi + atomik tüketim), nav "Stok" (`stock:view` koşullu); `QuantityInput` paylaşılan bileşeni (4 ondalık, birim soneki, adım düğmeleri) + 4 Storybook hikâyesi.
+- Mobil: araç stoğu cache (senkronizasyonda replace-all, kullanıcı bazlı), `parts.consume` outbox yürütücüsü (idempotency taşır; kalıcı reddi — stok aşımı vb. — 24 saat dondurma + teknisyene çakışma görünümü), iş emri detayında parça paneli (çevrimdışı kuyruğa alır, "Kuyruğa alındı" dürüst şerit), `listVanStock`/`consumePart` API istemcisi.
+- 9 yeni tablo RLS FORCE (`pg_class` 9/9 kanıtı) + NULLS NOT DISTINCT tekil indeksler (lot'suz bakiye/sayım satırı tekilleşir); çapraz kiracı stok erişimi 404/RLS satır kanıtı; hata zarfı güvenli ayrıntı listesi genişletildi (`available/requested/lotId/countId/reservationId`).
+- Demo tohum: 2 depo, 3 kalem (toplu/parti/seri), 2 lot, 5 deterministik hareket (`movementKey` sabit — tekrar seed'te çift yazım yok).
+- Testler: 538 birim (+100) + 190 entegrasyon (+33 stok senaryosu) + 75 Storybook (+4) + 43 E2E (+5; pano tarihi kiracı saat dilimine alındı — UTC gece sınırı düzeltmesi) + 111 mobil (+10). Bilinen sınırlar raporda (sayım aralık hareketleri, satın alma siparişleri kapsam dışı, Maestro BLOCKED).
+- TEST-09 kapısı: PASS (`docs/reports/PHASE-09-REPORT.md`).
+
 ## 0.8.0 — Phase 08: Technician job execution, GPS, media and signature
 
 - Kanıt kapıları (ADR-0010): `IN_PROGRESS→COMPLETED` yalnız tüm zorunlu checklist maddeleri tamamlanınca (409 `EVIDENCE_MISSING` + hata zarfında `missing[]` eksik listesi); `COMPLETED→CLOSED` için ≥1 imza (409, `details.gate`). Kapılar geçiş transaction'ı içinde — yetki sınıfı denetiminden sonra, atomik.

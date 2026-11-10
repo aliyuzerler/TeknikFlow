@@ -188,9 +188,12 @@ test.describe('dispatch panosu atama (seri)', () => {
   });
 });
 
-/** Pano günü (bugün) YYYY-MM-DD — planlama pano görünümünde kalıcı olsun. */
+/** Pano günü (bugün) YYYY-MM-DD — planlama pano görünümünde kalıcı olsun.
+ * KIRACI SAAT DİLİMİ (Europe/Istanbul) yerel tarihi kullanılır: UTC gece
+ * saatlerinde UTC tarihi İstanbul'dan bir gün geride kalabilir — pano
+ * kiracı yerel gününü gösterir (TEST-09 §8 saat dilimi sınırı). */
 function boardDateIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
 }
 
 /** HH:mm değerini N dakika kaydır (kuyruk penceresiyle örtüşme üretimi). */

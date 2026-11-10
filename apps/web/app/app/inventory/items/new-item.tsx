@@ -95,15 +95,27 @@ export function NewItemForm() {
       {success ? <Alert variant="success" title={success} /> : null}
 
       <FormField label="SKU" required>
-        {(ids) => <input name="sku" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="FLT-04-25" {...ids} />}
+        {(ids) => (
+          <input
+            name="sku"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            placeholder="FLT-04-25"
+            {...ids}
+          />
+        )}
       </FormField>
 
       <FormField label="Kalem adı" required>
-        {(ids) => <input name="name" value={name} onChange={(e) => setName(e.target.value)} {...ids} />}
+        {(ids) => (
+          <input name="name" value={name} onChange={(e) => setName(e.target.value)} {...ids} />
+        )}
       </FormField>
 
       <FormField label="Birim" required hint="ad, kutu, lt, m…">
-        {(ids) => <input name="unit" value={unit} onChange={(e) => setUnit(e.target.value)} {...ids} />}
+        {(ids) => (
+          <input name="unit" value={unit} onChange={(e) => setUnit(e.target.value)} {...ids} />
+        )}
       </FormField>
 
       <FormField label="İzleme modu" hint="Parti/seri kalemlerde hareket lot bağlanır">
@@ -112,7 +124,9 @@ export function NewItemForm() {
             {...ids}
             name="trackingMode"
             value={trackingMode}
-            onChange={(e) => setTrackingMode(e.target.value as (typeof STOCK_TRACKING_MODES)[number])}
+            onChange={(e) =>
+              setTrackingMode(e.target.value as (typeof STOCK_TRACKING_MODES)[number])
+            }
           >
             {STOCK_TRACKING_MODES.map((mode) => (
               <option key={mode} value={mode}>
