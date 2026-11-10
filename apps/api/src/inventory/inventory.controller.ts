@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -200,6 +201,7 @@ export class InventoryController {
 
   @Post('reservations/:reservationId/release')
   @RequireAnyPermissions('stock:manage', 'stock:manage_limited')
+  @HttpCode(200)
   async releaseReservation(
     @Param('reservationId') reservationId: string,
     @Body() body: unknown,
@@ -252,6 +254,7 @@ export class InventoryController {
 
   @Post('counts/:countId/close')
   @RequirePermissions('stock:manage')
+  @HttpCode(200)
   async closeCount(
     @Param('countId') countId: string,
     @Body() body: unknown,

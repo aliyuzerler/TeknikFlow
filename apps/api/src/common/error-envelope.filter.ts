@@ -137,6 +137,12 @@ function extractSafeDetails(body: string | object): Record<string, string | numb
     'supersededById',
     'timeEntryId',
     'failureCode',
+    // Faz 09: negatif stok kapısı bağlamı (serbest bakiye vs istenen).
+    'available',
+    'requested',
+    'lotId',
+    'countId',
+    'reservationId',
   ];
   const details: Record<string, string | number> = {};
   for (const key of allowed) {

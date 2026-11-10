@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module.js';
 import { PermissionsGuard } from '../rbac/permissions.guard.js';
 import { InventoryController } from './inventory.controller.js';
 import { InventoryService } from './inventory.service.js';
@@ -12,8 +13,10 @@ import { IdempotencyService } from '../execution/idempotency.service.js';
  *
  * IdempotencyService Faz 08 altyapısının aynısıdır (aynı tablo); burada
  * da sağlanır — ExecutionModule'a modül bağımlılığı kurulmaz (döngü yok).
+ * AuthModule: guard zincirinin JwtService bağımlılığı için zorunlu.
  */
 @Module({
+  imports: [AuthModule],
   controllers: [InventoryController, WorkOrderPartsController],
   providers: [InventoryService, WorkOrderPartsService, IdempotencyService, PermissionsGuard],
   exports: [InventoryService, WorkOrderPartsService],

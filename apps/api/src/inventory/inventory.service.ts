@@ -149,7 +149,7 @@ export class InventoryService {
         });
         return toStockItemView(item, 0);
       } catch (error) {
-        if (isUniqueViolation(error, 'stock_items_tenantId_sku_key')) {
+        if (isUniqueViolation(error)) {
           throw new ConflictException({
             message: `SKU zaten kayıtlı: ${input.sku}`,
             code: 'ITEM_DUPLICATE',
@@ -288,7 +288,7 @@ export class InventoryService {
         });
         return toWarehouseView(warehouse);
       } catch (error) {
-        if (isUniqueViolation(error, 'warehouses_tenantId_name_key')) {
+        if (isUniqueViolation(error)) {
           throw new ConflictException({
             message: `Depo adı zaten kayıtlı: ${input.name}`,
             code: 'WAREHOUSE_DUPLICATE',
@@ -340,7 +340,7 @@ export class InventoryService {
         });
         return toBinView(bin);
       } catch (error) {
-        if (isUniqueViolation(error, 'stock_bins_warehouseId_code_key')) {
+        if (isUniqueViolation(error)) {
           throw new ConflictException({
             message: `Raf kodu bu depoda zaten kayıtlı: ${input.code}`,
             code: 'BIN_DUPLICATE',
@@ -417,7 +417,7 @@ export class InventoryService {
         return { body: toMovementView(row), replayed: false };
       });
     } catch (error) {
-      if (isUniqueViolation(error, 'stock_movements_tenantId_movementKey_key')) {
+      if (isUniqueViolation(error)) {
         // Eşzamanlı yarış: kazananın satırını oynat (çift hareket YOK).
         const replay = await this.scoped.withTenant(tenantId, async (tx) =>
           tx.stockMovement.findFirst({
@@ -1144,22 +1144,25 @@ export class InventoryService {
 
 // ========================= Yardımcılar =========================
 
-function isUniqueViolation(error: unknown, constraint?: string): boolean {
-  const err = error as { code?: string; meta?: { target?: string[]; constraint?: string } };
+function isUniqueViolation(error: unknown, columnOrConstraint?: string): boolean {
+  const err = error as {
+    code?: string;
+    meta?: { target?: string[]; constraint?: string; modelName?: string };
+  };
   if (err?.code !== 'P2002') return false;
-  if (!constraint) return true;
+  if (!columnOrConstraint) return true;
+  // Prisma meta.target: kolon adları dizisi YA DA kısıt/indeks adı — ikisini de karşılaştır.
   const target = err.meta?.target ?? [];
-  return target.includes(constraint) || err.meta?.constraint === constraint;
+  const haystack = [...target.map(String), String(err.meta?.constraint ?? '')].join('|');
+  return haystack.includes(columnOrConstraint);
 }
 
 function negativeStock(available: number, requested: number): ConflictException {
   return new ConflictException({
     message: 'Stok yetersiz — negatif bakiye onaysız oluşturulamaz',
     code: 'NEGATIVE_STOCK_FORBIDDEN',
-    details: {
-      available: qtyToView(available),
-      requested: qtyToView(requested),
-    },
+    available: qtyToView(available),
+    requested: qtyToView(requested),
   });
 }
 
