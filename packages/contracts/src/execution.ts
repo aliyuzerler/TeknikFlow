@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ServicePrioritySchema, WorkOrderStatusSchema } from './service.js';
+import { PartConsumptionViewSchema } from './inventory.js';
 
 /**
  * Faz 08 — saha yürütme sözleşmeleri: GPS kilometre taşları (varış kaydı),
@@ -351,6 +352,9 @@ export const ExecutionReportViewSchema = z.object({
   timeEntries: z.array(TimeEntryViewSchema),
   media: z.array(MediaObjectViewSchema),
   signatures: z.array(SignatureViewSchema),
+  /** Faz 09 — parça tüketimi (CONSUME hareketleri) + toplam malzeme maliyeti. */
+  parts: z.array(PartConsumptionViewSchema),
+  partsCostMinor: z.number().int().nonnegative(),
   /** Zorunlu checklist eksikleri (COMPLETED kapısı için). */
   requiredChecklistRemaining: z.number().int().nonnegative(),
   generatedAt: z.string().datetime(),

@@ -66,6 +66,14 @@ model User {
   filesUploaded       FileObject[]         @relation("FileUploadedBy")
   signaturesCaptured  WorkOrderSignature[] @relation("SignatureCapturedBy")
 
+  // Faz 09 — stok ilişkileri (aktör rolleri)
+  assignedWarehouses  Warehouse[]         @relation("WarehouseAssignedUser")
+  stockMovementsActed StockMovement[]     @relation("StockMovementActor")
+  reservationsCreated StockReservation[]  @relation("StockReservationCreatedBy")
+  countsCreated       StockCount[]        @relation("StockCountCreatedBy")
+  countsClosed        StockCount[]        @relation("StockCountClosedBy")
+  countLinesCounted   StockCountLine[]    @relation("StockCountLineCountedBy")
+
   @@map("users")
 }
 
@@ -130,6 +138,17 @@ model Tenant {
   workOrderSignatures WorkOrderSignature[]
   idempotencyKeys     IdempotencyKey[]
 
+  // Faz 09 — stok
+  stockItems        StockItem[]
+  warehouses        Warehouse[]
+  stockBins         StockBin[]
+  stockLots         StockLot[]
+  stockMovements    StockMovement[]
+  stockBalances     StockBalance[]
+  stockReservations StockReservation[]
+  stockCounts       StockCount[]
+  stockCountLines   StockCountLine[]
+
   @@map("tenants")
 }
 
@@ -154,6 +173,7 @@ model Branch {
 
   workOrders WorkOrder[]
   teams      Team[]
+  warehouses Warehouse[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -743,6 +763,9 @@ model WorkOrder {
   media         FileObject[]
   signatures    WorkOrderSignature[]
 
+  // Faz 09 — stok rezervasyonları
+  partReservations StockReservation[]
+
   @@unique([tenantId, workOrderNo])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, assignedToId, scheduledStart])
@@ -1235,4 +1258,302 @@ model IdempotencyKey {
   @@id([tenantId, userId, key])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+// ========================= Faz 09 — Stok =========================
+
+/// Stok kataloğu (SKU). trackingMode izleme derinliğini belirler:
+/// NONE (toplu stok), LOT (parti numarası), SERIAL (seri numarası —
+/// her lot satırı tek adettir). Para alanları tam sayı küsur (kuruş).
+model StockItem {
+  id           String            @id @default(uuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  sku          String
+  name         String
+  description  String?
+  /// Birim (ad, kutu, metre...) — serbest kısa metin.
+  unit         String
+  trackingMode StockTrackingMode @default(NONE)
+  /// Yeniden sipariş eşiği — bakiye altına düşünce düşük stok uyarısı.
+  reorderPoint Decimal           @db.Decimal(18, 4)
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  lots         StockLot[]
+  movements    StockMovement[]
+  balances     StockBalance[]
+  reservations StockReservation[]
+  countLines   StockCountLine[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, active])
+  @@index([tenantId, name])
+  @@map("stock_items")
+}
+
+enum StockTrackingMode {
+  NONE
+  LOT
+  SERIAL
+  @@map("stock_tracking_mode")
+}
+
+/// Depo — CENTRAL (merkez), BRANCH (şube) ya da VEHICLE (teknisyen aracı).
+/// VEHICLE depolar assignedTo ile teknisyene bağlanır; "kendi aracı"
+/// yetkisi (stock:issue_own) bu bağ üzerinden doğrulanır.
+model Warehouse {
+  id          String        @id @default(uuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  branchId    String?
+  branch      Branch?       @relation(fields: [branchId], references: [id])
+  name        String
+  type        WarehouseType @default(CENTRAL)
+  /// VEHICLE depo sahibi teknisyen (kendi araç stoku).
+  assignedToId String?
+  assignedTo  User?         @relation("WarehouseAssignedUser", fields: [assignedToId], references: [id])
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  bins              StockBin[]
+  outgoingMovements StockMovement[] @relation("MovementFromWarehouse")
+  incomingMovements StockMovement[] @relation("MovementToWarehouse")
+  balances          StockBalance[]
+  reservations      StockReservation[]
+  counts            StockCount[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, type])
+  @@index([tenantId, assignedToId])
+  @@map("warehouses")
+}
+
+enum WarehouseType {
+  CENTRAL
+  BRANCH
+  VEHICLE
+  @@map("warehouse_type")
+}
+
+/// Depo raf bölümü (bin) — yerleşim adresi; stok dengesi bin düzeyinde
+/// tutulmaz (depoda tek denge), yalnız yerleşim bilgisi taşır.
+model StockBin {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  code        String
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([warehouseId, code])
+  @@index([tenantId, warehouseId])
+  @@map("stock_bins")
+}
+
+/// Parti / seri satırı — tracking LOT: lotNo zorunlu; SERIAL: her satır
+/// tek adettir ve seri numarası lotNo ile taşınır. SKU başına lotNo
+/// benzersiz; expiresAt geçen lot tüketime kapatılır (LOT_EXPIRED).
+model StockLot {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id])
+  lotNo       String
+  /// SERIAL modda seri numarası (lotNo ile aynı değer taşınır).
+  serialNo    String?
+  expiresAt   DateTime?
+  /// Birim maliyet (kuruş) — CONSUME/ISSUE birim maliyeti buradan donar.
+  costMinor   Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  movements    StockMovement[]
+  balances     StockBalance[]
+  reservations StockReservation[]
+  countLines   StockCountLine[]
+
+  @@unique([stockItemId, lotNo])
+  @@index([tenantId, stockItemId])
+  @@index([tenantId, expiresAt])
+  @@map("stock_lots")
+}
+
+/// Stok hareketi — APPEND-ONLY defter (docs/DATA_MODEL.md, AGENTS.md
+/// değişmezleri). Bakiye asla üzerine yazılmaz; hareket + bakiye
+/// güncellemesi TEK transaction'da yapılır. movementKey kiracı başına
+/// benzersizdir: çift gönderim aynı satırı üretmez (saklanan satır
+/// oynatılır). quantityDelta işaretlidir: RECEIVE +q, CONSUME −q,
+/// ADJUSTMENT ±q, TRANSFER/ISSUE/RETURN 0 (küresel toplam değişmez;
+/// depo dengeleri from/to ile güncellenir).
+model StockMovement {
+  id              String            @id @default(uuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  stockItemId     String
+  stockItem       StockItem         @relation(fields: [stockItemId], references: [id])
+  lotId           String?
+  lot             StockLot?         @relation(fields: [lotId], references: [id])
+  fromWarehouseId String?
+  fromWarehouse   Warehouse?        @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouseId   String?
+  toWarehouse     Warehouse?        @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id])
+  movementType    StockMovementType
+  /// Pozitif miktar — hareketin büyüklüğü (yön tür + from/to belirler).
+  quantity        Decimal           @db.Decimal(18, 4)
+  /// Kiracı geneli işaretli delta (küresel stok toplamı bakış açısı).
+  quantityDelta   Decimal           @db.Decimal(18, 4)
+  /// İz referansı — örn. ('work_order', uuid), ('stock_count', uuid).
+  referenceType   String?
+  referenceId     String?
+  /// İstemci üretimi UUID — çift hareket engeli (kiracı başına benzersiz).
+  movementKey     String?
+  /// Birim maliyet (kuruş) — CONSUME/ISSUE'da lot maliyetinden dondurulur.
+  unitCostMinor   Int?
+  note            String?
+  actorId         String
+  actor           User              @relation("StockMovementActor", fields: [actorId], references: [id])
+  occurredAt      DateTime          @default(now())
+
+  @@unique([tenantId, movementKey])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, stockItemId, occurredAt])
+  @@index([tenantId, referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  RECEIVE
+  ISSUE
+  TRANSFER
+  RETURN
+  CONSUME
+  ADJUSTMENT
+  @@map("stock_movement_type")
+}
+
+/// Depo × kalem × lot bakiyesi — hareketle AYNI transaction'da
+/// transactional bakım (AGENTS.md: "Balance is derived or transactionally
+/// maintained from movements"). lotId=null satırlar NONE izleme kalemidir
+/// (NULLS NOT DISTINCT tekil indeks migration'da kurulur). reservedQty
+/// açık rezervasyon toplamıdır; available = onHand − reservedQty.
+model StockBalance {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id])
+  lotId       String?
+  lot         StockLot? @relation(fields: [lotId], references: [id])
+  onHand      Decimal   @db.Decimal(18, 4)
+  reservedQty Decimal   @db.Decimal(18, 4)
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, stockItemId])
+  @@map("stock_balances")
+}
+
+/// İş emri rezervasyonu — stok kilidi (available düşürür). Tüketim
+/// consumedQty ilerletir; RELEASED rezervasyon kilidi geri verir.
+/// Serbest bakiye tüketimi rezervasyona dokunmaz (onHand − reserved
+/// sınırına tabidir).
+model StockReservation {
+  id            String                 @id @default(uuid())
+  tenantId      String
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
+  workOrderId   String
+  workOrder     WorkOrder              @relation(fields: [workOrderId], references: [id])
+  stockItemId   String
+  stockItem     StockItem              @relation(fields: [stockItemId], references: [id])
+  warehouseId   String
+  warehouse     Warehouse              @relation(fields: [warehouseId], references: [id])
+  lotId         String?
+  lot           StockLot?              @relation(fields: [lotId], references: [id])
+  reservedQty   Decimal                @db.Decimal(18, 4)
+  consumedQty   Decimal                @db.Decimal(18, 4)
+  status        StockReservationStatus @default(ACTIVE)
+  note          String?
+  createdById   String?
+  createdBy     User?                  @relation("StockReservationCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, status])
+  @@map("stock_reservations")
+}
+
+enum StockReservationStatus {
+  ACTIVE
+  PARTIALLY_CONSUMED
+  CONSUMED
+  RELEASED
+  @@map("stock_reservation_status")
+}
+
+/// Sayım oturumu (cycle count) — OPEN iken satırlar toplanır; CLOSE
+/// anında farklar için ADJUSTMENT hareketleri TEK transaction'da üretilir
+/// (sayım kapanana kadar bakiyeye dokunulmaz).
+model StockCount {
+  id          String           @id @default(uuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  warehouseId String
+  warehouse   Warehouse        @relation(fields: [warehouseId], references: [id])
+  status      StockCountStatus @default(OPEN)
+  note        String?
+  createdById String?
+  createdBy   User?            @relation("StockCountCreatedBy", fields: [createdById], references: [id])
+  closedById  String?
+  closedBy    User?            @relation("StockCountClosedBy", fields: [closedById], references: [id])
+  closedAt    DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  lines StockCountLine[]
+
+  @@index([tenantId, warehouseId, status])
+  @@map("stock_counts")
+}
+
+enum StockCountStatus {
+  OPEN
+  CLOSED
+  @@map("stock_count_status")
+}
+
+/// Sayım satırı — beklenen vs sayılan; delta CLOSE'ta hesaplanır.
+/// (countId, stockItemId, lotId) tekil — NULLS NOT DISTINCT indeks
+/// migration'da kurulur (lot'suz NONE kalemleri tek satırda toplar).
+model StockCountLine {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  countId     String
+  count       StockCount @relation(fields: [countId], references: [id])
+  stockItemId String
+  stockItem   StockItem  @relation(fields: [stockItemId], references: [id])
+  lotId       String?
+  lot         StockLot?  @relation(fields: [lotId], references: [id])
+  expectedQty Decimal    @db.Decimal(18, 4)
+  countedQty  Decimal?   @db.Decimal(18, 4)
+  deltaQty    Decimal?   @db.Decimal(18, 4)
+  note        String?
+  countedById String?
+  countedBy   User?      @relation("StockCountLineCountedBy", fields: [countedById], references: [id])
+  countedAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId, countId])
+  @@map("stock_count_lines")
 }

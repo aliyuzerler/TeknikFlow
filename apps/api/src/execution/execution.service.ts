@@ -21,6 +21,7 @@ import type { ScopedClient } from '../common/tenant-scoped-prisma.js';
 import { TenantScopedPrismaService } from '../common/tenant-scoped-prisma.js';
 import { IdempotencyService, type IdempotencyOutcome } from './idempotency.service.js';
 import { computeLaborSummary, entryDurationMinutes } from './execution-utils.js';
+import { toPartConsumptionView } from '../inventory/inventory-views.js';
 
 /**
  * Faz 08 — saha yürütme servisi: checklist, çalışma süresi kayıtları ve
@@ -385,6 +386,29 @@ export class ExecutionService {
         include: { uploadedBy: { select: { displayName: true } } },
       });
 
+      // Faz 09 — parça tüketimi: CONSUME defter satırları (referansla) ve
+      // lot maliyetinden donan toplam malzeme maliyeti (kuruş).
+      const partRows = await tx.stockMovement.findMany({
+        where: {
+          tenantId,
+          movementType: 'CONSUME',
+          referenceType: 'work_order',
+          referenceId: workOrder.id,
+        },
+        orderBy: { occurredAt: 'asc' },
+        include: {
+          stockItem: { select: { sku: true, name: true, unit: true, trackingMode: true } },
+          lot: { select: { lotNo: true } },
+          fromWarehouse: { select: { id: true, name: true } },
+          actor: { select: { displayName: true } },
+        },
+      });
+      const parts = partRows.map(toPartConsumptionView);
+      const partsCostMinor = parts.reduce(
+        (sum, part) => sum + (part.totalCostMinor ?? 0),
+        0,
+      );
+
       const labor: LaborSummary = computeLaborSummary(
         workOrder.timeEntries.map((entry) => ({
           type: entry.type,
@@ -420,6 +444,8 @@ export class ExecutionService {
         timeEntries: workOrder.timeEntries.map((entry) =>
           toTimeEntryView(entry, entry.user?.displayName ?? null),
         ),
+        parts,
+        partsCostMinor,
         media: mediaRows.map((row) => ({
           mediaId: row.id,
           workOrderId: row.workOrderId,
