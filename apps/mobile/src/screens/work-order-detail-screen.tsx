@@ -1,21 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { WorkOrderView } from '@teknikflow/contracts';
+import type { ExecutionReportView, WorkOrderView } from '@teknikflow/contracts';
 import { EmptyView, ErrorView, LoadingView } from '../components/screen-states';
 import { StatusBadge } from '../components/status-badge';
+import { ExecutionPanel } from '../components/execution-panel';
 import { formatDateTime, formatScheduleWindow, slaLabel } from '../lib/format';
+import type { ExecutionActions } from './execution-actions';
 import { theme } from '../theme';
 
 /**
- * Faz 07 — iş emri detayı (salt okunur snapshot). Saha eylemleri (kabul,
- * yol/yerinde, kontrol listesi, fotoğraf, imza) Faz 08'de bu ekrana gelir;
- * o fazda taslak/outbox akışı devreye girer.
+ * Faz 07 — iş emri detayı (snapshot).
+ * Faz 08 — saha yürütme paneli: kabul/yol/varış(GPS)/iş/bitiş eylemleri,
+ * checklist, süre takibi, imza ve kanıt özeti (rapor). Eylemler outbox'a
+ * girer; rapor çevrimiçiyse çekilir, çevrimdışıyken panel kuyruğa alır.
  */
 
 export interface WorkOrderDetailScreenProps {
   getOrder(id: string): Promise<WorkOrderView | null>;
   workOrderId: string;
   onBack(): void;
+  /** Faz 08: saha eylemleri (opsiyonel — testler basit kalabilir). */
+  execution?: {
+    actions: ExecutionActions;
+    isOnline(): boolean;
+    pendingCount(): Promise<number>;
+    getReport(id: string): Promise<ExecutionReportView | null>;
+  };
   testIDPrefix?: string;
 }
 
@@ -23,10 +33,16 @@ export function WorkOrderDetailScreen({
   getOrder,
   workOrderId,
   onBack,
+  execution,
   testIDPrefix = 'wo-detail',
 }: WorkOrderDetailScreenProps) {
   const [order, setOrder] = useState<WorkOrderView | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const [report, setReport] = useState<ExecutionReportView | null>(null);
+  const [pending, setPending] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const online = execution?.isOnline() ?? false;
 
   useEffect(() => {
     void (async () => {
@@ -38,7 +54,23 @@ export function WorkOrderDetailScreen({
         setState('missing');
       }
     })();
-  }, [workOrderId]);
+  }, [workOrderId, refreshTick]);
+
+  useEffect(() => {
+    if (!execution) return;
+    void (async () => {
+      const [nextReport, nextPending] = await Promise.all([
+        execution.isOnline() ? execution.getReport(workOrderId) : Promise.resolve(null),
+        execution.pendingCount(),
+      ]);
+      setReport(nextReport);
+      setPending(nextPending);
+    })();
+  }, [workOrderId, execution, refreshTick, online]);
+
+  const onAfterAction = useCallback(() => {
+    setRefreshTick((tick) => tick + 1);
+  }, []);
 
   if (state === 'loading') return <LoadingView testID={`${testIDPrefix}-loading`} />;
   if (state === 'missing') {
@@ -107,6 +139,18 @@ export function WorkOrderDetailScreen({
           <Row label="Tamamlama" value={formatDateTime(order.completedAt)} />
         ) : null}
       </Section>
+
+      {execution ? (
+        <ExecutionPanel
+          order={order}
+          actions={execution.actions}
+          report={report}
+          online={online}
+          pendingCount={pending}
+          onAfterAction={onAfterAction}
+          testIDPrefix={`${testIDPrefix}-execution`}
+        />
+      ) : null}
     </ScrollView>
   );
 }

@@ -65,7 +65,13 @@ export default function App(): React.JSX.Element {
           workOrderCache={cache}
           getIdentity={async () => identityHolder.current}
         >
-          <SessionRoot api={api} cache={cache} identityHolder={identityHolder} />
+          <SessionRoot
+            api={api}
+            cache={cache}
+            outbox={outbox}
+            drainOutbox={() => syncService.drainOutbox()}
+            identityHolder={identityHolder}
+          />
         </SyncProvider>
       </SessionProvider>
     </SafeAreaProvider>
@@ -75,10 +81,14 @@ export default function App(): React.JSX.Element {
 function SessionRoot({
   api,
   cache,
+  outbox,
+  drainOutbox,
   identityHolder,
 }: {
   api: ReturnType<typeof createMobileApiClient>;
   cache: ReturnType<typeof createWorkOrderCache>;
+  outbox: ReturnType<typeof createOutboxRepo>;
+  drainOutbox: () => Promise<{ sent: number; failed: number }>;
   identityHolder: { current: { userId: string; tenantId: string } | null };
 }) {
   const session = useSession();
@@ -90,5 +100,13 @@ function SessionRoot({
       : null;
   identityHolder.current = identity;
 
-  return <AppNavigatorContainer api={api} cache={cache} identity={identity} />;
+  return (
+    <AppNavigatorContainer
+      api={api}
+      cache={cache}
+      identity={identity}
+      outbox={outbox}
+      drainOutbox={drainOutbox}
+    />
+  );
 }

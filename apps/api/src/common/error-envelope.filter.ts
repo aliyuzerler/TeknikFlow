@@ -43,6 +43,8 @@ export interface ErrorEnvelope {
     workOrderId: string | null;
     workOrderNo: string | null;
   }>;
+  /** Faz 08: 409 EVIDENCE_MISSING — eksik zorunlu checklist maddeleri. */
+  missing?: Array<{ itemId: string; label: string }>;
 }
 
 function readRequestId(request: Request): string {
@@ -78,6 +80,8 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
     const details = extractSafeDetails(body);
     // Faz 06: planlama çakışması bulguları (aynı kiracının iş emirleri).
     const conflicts = extractConflicts(body);
+    // Faz 08: kanıt eksikliği maddeleri (aynı kiracının checklist'i).
+    const missing = extractMissing(body);
     return {
       code,
       message,
@@ -86,6 +90,7 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
       ...(fieldErrors ? { fieldErrors } : {}),
       ...(details ? { details } : {}),
       ...(conflicts ? { conflicts } : {}),
+      ...(missing ? { missing } : {}),
     };
   }
 
@@ -120,7 +125,19 @@ function extractMessage(body: string | object): string {
  */
 function extractSafeDetails(body: string | object): Record<string, string | number> | undefined {
   if (typeof body !== 'object' || body === null) return undefined;
-  const allowed = ['customerId', 'assetId', 'invitationId', 'assetCount', 'limit'];
+  const allowed = [
+    'customerId',
+    'assetId',
+    'invitationId',
+    'assetCount',
+    'limit',
+    // Faz 08: kanıt kapısı bağlamı + imza/süre çakışma işaretçileri.
+    'gate',
+    'signatureCount',
+    'supersededById',
+    'timeEntryId',
+    'failureCode',
+  ];
   const details: Record<string, string | number> = {};
   for (const key of allowed) {
     if (key in body) {
@@ -160,6 +177,27 @@ function extractConflicts(body: string | object): ErrorEnvelope['conflicts'] | u
         workOrderId: record.workOrderId as string | null,
         workOrderNo: record.workOrderNo as string | null,
       });
+    }
+  }
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+/**
+ * Faz 08 — EVIDENCE_MISSING gövdesindeki eksik madde listesi: yalnız iyi
+ * biçimli satırlar taşınır (itemId + label; kendi kiracısının checklist'i).
+ */
+function extractMissing(body: string | object): ErrorEnvelope['missing'] | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  if (!('missing' in body) || !Array.isArray((body as { missing?: unknown }).missing)) {
+    return undefined;
+  }
+  const rows = (body as { missing: unknown[] }).missing;
+  const parsed: NonNullable<ErrorEnvelope['missing']> = [];
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const record = row as Record<string, unknown>;
+    if (typeof record.itemId === 'string' && typeof record.label === 'string') {
+      parsed.push({ itemId: record.itemId, label: record.label });
     }
   }
   return parsed.length > 0 ? parsed : undefined;

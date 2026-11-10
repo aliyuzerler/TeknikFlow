@@ -1,11 +1,16 @@
 import type { MobileApiClient } from '../api/client';
 import type { OutboxRepo } from '../cache/outbox-repo';
 import type { WorkOrderCache } from '../cache/work-order-cache';
+import { executorFor } from './outbox-executors';
 
 /**
  * Faz 07 — senkron servisi (ADR-0004 §3: sunucu-otoriter çekme + kuyruk
  * boşaltma). Gelen kutusu verisi sunucudan PULL edilir; outbox işlemleri
- * sırada boşaltılır (Faz 07: operasyon yok — altyapı hazır).
+ * sırada boşaltılır.
+ *
+ * Faz 08 — yürütücüler bağlı: geçiş/GPS varış/checklist/süre/imza
+ * işlemleri idempotency anahtarıyla gönderilir. Ağ hatası → üstel geri
+ * ödeme; kalıcı reddi (4xx) → 24 saat dondurma (sunucu kazanır).
  */
 
 export type SyncOutcome =
@@ -80,10 +85,42 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
       let failed = 0;
       for (const row of rows) {
         await outbox.markSyncing(row.id);
-        // Faz 07: operasyon yürütücüsü yok (set boş) — satır 'failed' yerine
-        // kuyrukta kalır; Faz 08 yürütücülerini buraya bağlar.
-        failed += 0;
-        sent += 0;
+        // Faz 08: işlem yürütücüsü — idempotency anahtarı satırda hazır.
+        const execute = executorFor(row.operation);
+        if (!execute) {
+          // Bilinmeyen işlem türü: kalıcı reddi — 24 saat dondur.
+          await outbox.markFailed(
+            row.id,
+            `Bilinmeyen işlem: ${row.operation}`,
+            new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+          );
+          failed += 1;
+          continue;
+        }
+        const outcome = await execute(api, row);
+        if (outcome.ok) {
+          await outbox.markDone(row.id);
+          sent += 1;
+          continue;
+        }
+        if (outcome.retryable) {
+          // Ağ/zaman aşımı/5xx → üstel geri ödeme (5s → cap 5dk).
+          await outbox.markFailed(
+            row.id,
+            outcome.message ?? 'Ağ hatası',
+            new Date(Date.now() + nextBackoffMs(row.attempts)).toISOString(),
+          );
+        } else {
+          // Kalıcı reddi (4xx): sunucu sözleşme/yetki/durum makinesi kazanır.
+          // Kuyrukta görünür kalır ama 24 saat yeniden denenmez — çakışma
+          // görünümü teknisyene sunulur (OFFLINE_SYNC çatışma politikası).
+          await outbox.markFailed(
+            row.id,
+            outcome.message ?? 'Sunucu reddi',
+            new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+          );
+        }
+        failed += 1;
       }
       return { sent, failed };
     },

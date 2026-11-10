@@ -128,6 +128,40 @@ async function transition(
   return authed(cookies).post(`/api/v1/work-orders/${workOrderId}/transition`).send(body);
 }
 
+/** Faz 08 — geçerli GPS varış konumu (varış kaydı testi için). */
+const GPS_LOCATION = {
+  latitude: 41.0082,
+  longitude: 28.9784,
+  accuracyMeters: 12.5,
+  capturedAt: '2026-11-10T09:30:00.000Z',
+  source: 'GPS',
+};
+
+/** Faz 08 — manuel onaylı varış (izin reddi senaryosu). */
+const MANUAL_LOCATION = {
+  capturedAt: '2026-11-10T09:35:00.000Z',
+  source: 'MANUAL',
+  manualReason: 'Konum izni reddedildi',
+};
+
+/** Faz 08 — imza yakalama gövdesi (kapatma kapısı için). */
+function signatureBody(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    role: 'CUSTOMER',
+    signerName: 'Ayşe Yılmaz',
+    signedAt: '2026-11-10T12:00:00.000Z',
+    strokes: [
+      [
+        { x: 0.1, y: 0.2, t: 0 },
+        { x: 0.2, y: 0.25, t: 40 },
+        { x: 0.3, y: 0.3, t: 80 },
+        { x: 0.4, y: 0.32, t: 120 },
+      ],
+    ],
+    ...over,
+  };
+}
+
 beforeAll(async () => {
   resetEnvCache();
   getEnv().AUTH_RATE_LIMIT_MAX = 1000;
@@ -228,7 +262,11 @@ describe('tam yaşam döngüsü (izinli geçişler uçtan uca)', () => {
 
     response = await transition(tech1.cookies, workOrderId, { to: 'EN_ROUTE' });
     expect(response.status).toBe(201);
-    response = await transition(tech1.cookies, workOrderId, { to: 'ON_SITE' });
+    // Faz 08: varış GPS kilometre taşıyla — konum zorunlu.
+    response = await transition(tech1.cookies, workOrderId, {
+      to: 'ON_SITE',
+      location: GPS_LOCATION,
+    });
     expect(response.status).toBe(201);
     response = await transition(tech1.cookies, workOrderId, { to: 'IN_PROGRESS' });
     expect(response.status).toBe(201);
@@ -245,10 +283,23 @@ describe('tam yaşam döngüsü (izinli geçişler uçtan uca)', () => {
     expect(response.status).toBe(201);
     expect(response.body.completedAt).toBeTruthy();
 
-    // Teknisyen KAPATAMAZ (yönetici yetkisi) — 403.
+    // Teknisyen KAPATAMAZ (yönetici yetkisi) — 403 (imza kapısından ÖNCE).
     const closeAttempt = await transition(tech1.cookies, workOrderId, { to: 'CLOSED' });
     expect(closeAttempt.status).toBe(403);
     expect(closeAttempt.body.code).toBe('FORBIDDEN');
+
+    // Faz 08: kapatma kanıt kapısı — imza OLMADAN kapatma → 409 EVIDENCE_MISSING.
+    const noSignature = await transition(owner, workOrderId, { to: 'CLOSED' });
+    expect(noSignature.status).toBe(409);
+    expect(noSignature.body.code).toBe('EVIDENCE_MISSING');
+    expect(noSignature.body.details.gate).toBe('CLOSED');
+
+    // İmza yakala (owner: signature:capture + view_all) → artık kapanabilir.
+    const signature = await authed(owner)
+      .post(`/api/v1/work-orders/${workOrderId}/signatures`)
+      .send(signatureBody());
+    expect(signature.status).toBe(201);
+    expect(signature.body.role).toBe('CUSTOMER');
 
     response = await transition(owner, workOrderId, { to: 'CLOSED' });
     expect(response.status).toBe(201);
@@ -289,7 +340,7 @@ describe('tam yaşam döngüsü (izinli geçişler uçtan uca)', () => {
     await transition(owner, workOrderId, { to: 'ASSIGNED', assigneeUserId: tech1.userId });
     await transition(tech1.cookies, workOrderId, { to: 'ACCEPTED' });
     await transition(tech1.cookies, workOrderId, { to: 'EN_ROUTE' });
-    await transition(tech1.cookies, workOrderId, { to: 'ON_SITE' });
+    await transition(tech1.cookies, workOrderId, { to: 'ON_SITE', location: MANUAL_LOCATION });
     await transition(tech1.cookies, workOrderId, { to: 'IN_PROGRESS' });
 
     for (const target of ['WAITING_PARTS', 'IN_PROGRESS', 'WAITING_CUSTOMER', 'IN_PROGRESS']) {
@@ -305,7 +356,7 @@ describe('tam yaşam döngüsü (izinli geçişler uçtan uca)', () => {
     await transition(owner, workOrderId, { to: 'ASSIGNED', assigneeUserId: tech1.userId });
     await transition(tech1.cookies, workOrderId, { to: 'ACCEPTED' });
     await transition(tech1.cookies, workOrderId, { to: 'EN_ROUTE' });
-    await transition(tech1.cookies, workOrderId, { to: 'ON_SITE' });
+    await transition(tech1.cookies, workOrderId, { to: 'ON_SITE', location: GPS_LOCATION });
     await transition(tech1.cookies, workOrderId, { to: 'IN_PROGRESS' });
     await transition(tech1.cookies, workOrderId, { to: 'COMPLETED' });
 
@@ -342,9 +393,14 @@ describe('geçersiz geçişler reddedilir (409 INVALID_TRANSITION)', () => {
     const { workOrderId } = await createWorkOrder(tenantA, { subject: `Geçersiz ${RUN}` });
     const owner = tenantA.cookies;
 
-    // DRAFT'tan yürütme adımlarına atlanamaz.
+    // DRAFT'tan yürütme adımlarına atlanamaz. Faz 08: ON_SITE hedefine
+    // sözleşme konum istediğinden geçerli konumla gönderilir — reddin nedeni
+    // durum makinesi (409) olmalı, sözleşme (400) değil.
     for (const to of ['ACCEPTED', 'EN_ROUTE', 'ON_SITE', 'IN_PROGRESS', 'COMPLETED', 'CLOSED']) {
-      const response = await transition(owner, workOrderId, { to });
+      const response = await transition(owner, workOrderId, {
+        to,
+        ...(to === 'ON_SITE' ? { location: GPS_LOCATION } : {}),
+      });
       expect(response.status, `DRAFT→${to}`).toBe(409);
       expect(response.body.code).toBe('INVALID_TRANSITION');
     }

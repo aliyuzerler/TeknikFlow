@@ -1,6 +1,23 @@
 # Changelog
 
+## 0.8.0 — Phase 08: Technician job execution, GPS, media and signature
+
+- Kanıt kapıları (ADR-0010): `IN_PROGRESS→COMPLETED` yalnız tüm zorunlu checklist maddeleri tamamlanınca (409 `EVIDENCE_MISSING` + hata zarfında `missing[]` eksik listesi); `COMPLETED→CLOSED` için ≥1 imza (409, `details.gate`). Kapılar geçiş transaction'ı içinde — yetki sınıfı denetiminden sonra, atomik.
+- GPS kilometre taşları: `EN_ROUTE→ON_SITE` (ARRIVE) konum ZORUNLU — `source=GPS` koordinat ister; izin reddi/çevrimdışı geri dönüşü `source=MANUAL` + zorunlu `manualReason` (koordinatsız geçerli); `→COMPLETED` ayrılış (DEPARTED) opsiyonel konumla; append-only `work_order_visits` (recordedAt cihaz zamanından — geç senkronlarda varış saati gerçek kalır); diğer geçişlerde konum olay metadata'sında.
+- Checklist: madde ekleme (planlama/ofis YA DA atanan teknisyen), tamamlama/geri alma (idempotent — aynı durum no-op), zorunlu maddeler tamamlama kapısına bağlı; her değişiklik olay akışı + audit.
+- İşgücü kayıtları: TRAVEL/LABOR/WAITING; kullanıcı-iş başına tek AÇIK kayıt (409 `TIME_ENTRY_ALREADY_OPEN`); durdurma idempotent; dakika ceil; rapor `labor` özeti (Faz 06 kapasite tahmininin sahadaki gerçek karşılığı).
+- İmza — ekle-güncelle-yok: JSON yol koordinatları (0..1 normalize `{x,y,t}`; SVG YOK → script enjeksiyon yüzeyi yok); düzeltme yeni satır + `correctionOfId`, eski satırın `supersededById` işaretçisi tek seferlik (içerik değişmez); ikinci düzeltme 409 `SIGNATURE_ALREADY_CORRECTED`; yetki `signature:capture` + kaynak düzeyi.
+- Medya — ADR-0005 iki adımlı yükleme uygulaması: init (PENDING_UPLOAD + 10dk imzalı PUT) → istemci doğrudan RustFS'e → complete (HEAD + ilk 32 bayt magic-byte + boyut + MIME doğrulaması → READY | FAILED sınıflı kodla: `EMPTY_OBJECT`/`SIZE_LIMIT`/`MAGIC_BYTE_MISMATCH`); beyaz liste PHOTO jpeg/png 15MB, VIDEO mp4 200MB, DOCUMENT pdf 25MB; SVG reddi; opak kiracı-önekli nesne anahtarı, dosya adı yalnız metadata (path traversal sözleşme reddi); READY medyaya 5dk imzalı indirme URL'si; çift complete idempotent; PUT yapılmadan complete 409 `UPLOAD_NOT_RECEIVED`.
+- Idempotency: `idempotency_keys` (kiracı, kullanıcı, anahtar) tekil — mobil outbox UUID'leriyle `x-idempotency-key`; iş mantığı + yanıt kaydı AYNI transaction'da (çökmede birlikte geri alınır); oynatma `x-idempotent-replay: true` + TAZE imzalı URL'ler; TTL 24 saat; eşzamanlı çift gönderimde tekil kısıt → kaybeden rollback.
+- Mobil: GPS sağlayıcı soyutlaması (`expo-location` adapter'i App kabuğunda; izin reddi → manuel onay UI akışı); outbox yürütücüleri (transition/arrive/checklist/time/signature — ağ hatası üstel backoff, kalıcı 4xx 24 saat dondurma "sunucu kazanır"); saha yürütme paneli (eylem düğmeleri, checklist, süre, imza tuvali, konum kayıtları, medya); detay ekranı rapor çeker; SignaturePad (PanResponder, normalize noktalar).
+- Web: varış bildiri çekmecesi (tarayıcı konumu → izin redliyken manuel onay + neden); EVIDENCE_MISSING eksik listesi/kapı mesajı dürüst gösterimi; yürütme paneli (checklist + süre + imza + kanıt); `/app/work-orders/:id/report` yürütme raporu (işgücü özeti, konum kayıtları ±m doğrulukla, checklist, süre, medya, imzalar SVG eskiz render'ı); SignaturePad (HTML canvas, erişilebilir) + Storybook etkileşim testi.
+- api-client: execution typed istemcisi (idempotency başlığı + `replayed` bilgisi + EVIDENCE_MISSING `missing[]` alanı).
+- 6 yeni tablo RLS FORCE (`pg_class` 6/6 kanıtı); 7 enum; kiracı izolasyonu entegrasyonla (çapraz-kiratı okuma/yazma 404).
+- Testler: 37 sözleşme (+13) + 170 API birim (+13) + 157 entegrasyon (+18: execution) + 104 ui-web birim (+7) + 71 Storybook (+1 hikâye) + 99 mobil (+28) + 38 E2E (varış manuel onay + imza kapısı + rapor genişletildi).
+- TEST-08 kapısı: PASS (`docs/reports/PHASE-08-REPORT.md`); Maestro yürütme emülatörsüz ortamda BLOCKED (Faz 07 kalıntısı — belgelendi).
+
 ## 0.7.0 — Phase 07: Mobile foundation and technician inbox
+: Mobile foundation and technician inbox
 
 - Expo mobil temel: React Navigation (native-stack) — oturum durumuna göre Giriş ya da uygulama akışı (Gelen Kutusu → İş Emri Detayı → Hesap); açılış/yükleme/boş/hata durumları; derin bağlantı `tfmobile://wo/{id}` → detay (geçersiz yol null — hiçbir ekrana taşınmaz).
 - Güvenli oturum (ADR-0002 mobil akışı): tokenlar `expo-secure-store` (Keychain/Keystore) — SQLite/düz depo YOK; login (client: mobile + çoklu üyelik seçimi), erişim tokenı 401'de otomatik refresh + tek tekrar, refresh ölümünde temiz çıkış; logout sunucu refresh iptali + tüm yerel veri silme.

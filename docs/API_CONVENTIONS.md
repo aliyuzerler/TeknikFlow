@@ -14,7 +14,8 @@
 - `GET/POST /customers`, `/customers/:id/contacts`, `/service-locations`
 - `GET/POST /assets`, `/assets/:id/history`
 - `GET/POST /service-requests`, `POST /service-requests/:id/convert-to-work-order`
-- `GET/POST /work-orders`, `POST /work-orders/:id/transitions`, `/assignments`, `/checklists`, `/labor`, `/expenses`, `/attachments`, `/signature`, `/report`
+- `GET/POST /work-orders`, `POST /work-orders/:id/transition` (Faz 08: opsiyonel `location` — ON_SITE hedefinde zorunlu)
+- Faz 08 yürütme: `POST/PATCH /work-orders/:id/checklist-items[/:itemId]`, `POST /work-orders/:id/time-entries[/:entryId/stop]`, `POST /work-orders/:id/media[/:mediaId/complete]` (iki adımlı — ADR-0005), `POST /work-orders/:id/signatures` (ekle-güncelle-yok; `correctionOfId`), `GET /work-orders/:id/report`; mutasyonlarda `x-idempotency-key` başlığı (UUID) — oynatma `x-idempotent-replay: true`
 - `GET/POST /dispatch/board`, `/dispatch/availability`
 - `GET/POST /inventory/items`, `/warehouses`, `/movements`, `/reservations`, `/counts`, `/transfers`
 - `GET/POST /maintenance/plans`, `/maintenance/schedules`

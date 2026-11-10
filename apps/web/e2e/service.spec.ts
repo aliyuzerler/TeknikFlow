@@ -90,11 +90,27 @@ test.describe('talep → iş emri yaşam döngüsü (seri)', () => {
       page.getByRole('heading', { level: 1, name: `E2E Yaşam Döngüsü ${RUN}` }),
     ).toBeVisible();
 
-    // Yürütme zinciri: kabul → yola çık → varış → başla → tamamla.
+    // Yürütme zinciri: kabul → yola çık → varış (manuel onay — izin reddi
+    // kabul kriteri) → başla → tamamla.
     for (const [label, expected] of [
       ['İşi kabul et', 'Kabul Edildi'],
       ['Yola çık', 'Yolda'],
-      ['Varış bildir', 'Yerinde'],
+    ] as const) {
+      await page.getByRole('button', { name: label }).click();
+      await expect(page.getByText(expected).first()).toBeVisible({ timeout: 10_000 });
+    }
+
+    // Faz 08 — varış bildiri çekmecesi: tarayıcı konumu izni reddedilir
+    // (headless varsayılanı) → manuel onay + zorunlu nedenle devam.
+    await page.getByRole('button', { name: 'Varış bildir' }).click();
+    const arriveDrawer = page.getByRole('dialog', { name: 'Varış bildir' });
+    await expect(arriveDrawer).toBeVisible();
+    await expect(arriveDrawer.getByText('Konum alınamadı')).toBeVisible({ timeout: 12_000 });
+    await arriveDrawer.getByLabel('Manuel onay nedeni').fill('Konum izni reddedildi (E2E)');
+    await arriveDrawer.getByRole('button', { name: 'Varışı kaydet' }).click();
+    await expect(page.getByText('Yerinde').first()).toBeVisible({ timeout: 10_000 });
+
+    for (const [label, expected] of [
       ['İşe başla', 'Devam Ediyor'],
       ['Tamamla', 'Tamamlandı'],
     ] as const) {
@@ -123,7 +139,30 @@ test.describe('talep → iş emri yaşam döngüsü (seri)', () => {
     ).toBeVisible();
     await expect(page.getByText('Tamamlandı').first()).toBeVisible();
 
-    // Kapatma yönetici yetkisinde.
+    // Faz 08 — kapatma kanıt kapısı: imza OLMADAN kapatma reddedilir.
+    await page.getByRole('button', { name: 'Kapat' }).click();
+    await expect(
+      page.getByText('Kapatma için en az bir imza gerekli', { exact: false }).first(),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // İmza yakala: imzalayan adı + tuvale fareyle çizim (pointer olayları).
+    await page.getByLabel('İmzalayan adı').fill('Ayşe Yılmaz');
+    const pad = page.getByTestId('tf-signature-canvas');
+    const box = await pad.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + 24, box.y + 40);
+      await page.mouse.down();
+      for (let step = 1; step <= 10; step += 1) {
+        await page.mouse.move(box.x + 24 + step * 18, box.y + 40 + (step % 3) * 8, {
+          steps: 2,
+        });
+      }
+      await page.mouse.up();
+    }
+    await page.getByRole('button', { name: 'İmzayı kaydet' }).click();
+    await expect(page.getByText('İmza kaydedildi.')).toBeVisible({ timeout: 10_000 });
+
+    // Artık kapatma başarılı.
     await page.getByRole('button', { name: 'Kapat' }).click();
     await expect(page.getByText('Kapatıldı').first()).toBeVisible({ timeout: 10_000 });
 
@@ -137,6 +176,18 @@ test.describe('talep → iş emri yaşam döngüsü (seri)', () => {
     // Terminal durumda hiçbir eylem düğmesi yok.
     await expect(page.getByRole('button', { name: 'Planla' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Teknisyen ata' })).toHaveCount(0);
+
+    // Faz 08 — yürütme raporu: varış kaydı (manuel onay) + imza birleşir.
+    await page.getByRole('link', { name: 'Raporu görüntüle →' }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: `E2E Yaşam Döngüsü ${RUN}` }),
+    ).toBeVisible();
+    await expect(page.getByText('Konum kayıtları')).toBeVisible();
+    await expect(page.getByText('Varış').first()).toBeVisible();
+    await expect(page.getByText('Manuel onay: Konum izni reddedildi (E2E)')).toBeVisible();
+    await expect(page.getByText('İmzalar')).toBeVisible();
+    await expect(page.getByText('Ayşe Yılmaz').first()).toBeVisible();
+    await expect(page.getByText('İşgücü özeti')).toBeVisible();
   });
 });
 

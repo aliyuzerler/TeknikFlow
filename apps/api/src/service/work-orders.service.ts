@@ -579,6 +579,36 @@ export class WorkOrdersService {
         });
       }
 
+      // Faz 08 — KANIT KAPILARI (ADR-0010): COMPLETED için zorunlu checklist
+      // tam; CLOSED için en az bir imza. Eksikte 409 EVIDENCE_MISSING.
+      if (input.to === 'COMPLETED') {
+        const missingItems = await tx.workOrderChecklistItem.findMany({
+          where: { workOrderId: current.id, tenantId, required: true, done: false },
+          select: { id: true, label: true },
+        });
+        if (missingItems.length > 0) {
+          throw new ConflictException({
+            message: 'Zorunlu checklist maddeleri eksik — tamamlanmadan iş bitirilemez',
+            code: 'EVIDENCE_MISSING',
+            gate: 'COMPLETED',
+            missing: missingItems.map((item) => ({ itemId: item.id, label: item.label })),
+          });
+        }
+      }
+      if (input.to === 'CLOSED') {
+        const signatureCount = await tx.workOrderSignature.count({
+          where: { workOrderId: current.id, tenantId },
+        });
+        if (signatureCount === 0) {
+          throw new ConflictException({
+            message: 'Kapatma için en az bir imza gerekli',
+            code: 'EVIDENCE_MISSING',
+            gate: 'CLOSED',
+            signatureCount: 0,
+          });
+        }
+      }
+
       // Eyleme özgü doğrulama ve yan veriler.
       const extra: Prisma.WorkOrderUpdateInput = {};
       const eventMetadata: Record<string, unknown> = { action: rule.action };
@@ -656,6 +686,47 @@ export class WorkOrdersService {
         extra.cancellationReason = input.reasonCode!;
         extra.cancellationNote = input.note ?? null;
         eventMetadata.reasonCode = input.reasonCode!;
+      }
+
+      // Faz 08 — GPS kilometre taşı: ARRIVE/COMPLETE ziyaret satırı yazar;
+      // diğer geçişlerde konum yalnızca olay metadata'sında kalır.
+      if (rule.action === 'ARRIVE') {
+        const location = input.location!;
+        await tx.workOrderVisit.create({
+          data: {
+            tenantId,
+            workOrderId: current.id,
+            userId: actor.userId,
+            milestone: 'ARRIVED',
+            latitude: location.latitude ?? null,
+            longitude: location.longitude ?? null,
+            accuracyMeters: location.accuracyMeters ?? null,
+            source: location.source,
+            manualReason: location.manualReason ?? null,
+            recordedAt: new Date(location.capturedAt),
+          },
+        });
+        eventMetadata.location = locationMetadata(location);
+      } else if (rule.action === 'COMPLETE') {
+        if (input.location) {
+          await tx.workOrderVisit.create({
+            data: {
+              tenantId,
+              workOrderId: current.id,
+              userId: actor.userId,
+              milestone: 'DEPARTED',
+              latitude: input.location.latitude ?? null,
+              longitude: input.location.longitude ?? null,
+              accuracyMeters: input.location.accuracyMeters ?? null,
+              source: input.location.source,
+              manualReason: input.location.manualReason ?? null,
+              recordedAt: new Date(input.location.capturedAt),
+            },
+          });
+          eventMetadata.location = locationMetadata(input.location);
+        }
+      } else if (input.location) {
+        eventMetadata.location = locationMetadata(input.location);
       }
 
       // Zaman damgaları + atama temizliği (durum makinesi etkileri).
@@ -757,6 +828,22 @@ export class WorkOrdersService {
             toState: 'CANCELLED',
             actorId: actor.userId,
             metadataJson: { reasonCode: input.reasonCode },
+          },
+        });
+      }
+
+      // Faz 08 — ziyaret kilometre taşı olayı (varış/ayrılış kaydı timeline'da).
+      if (rule.action === 'ARRIVE' || (rule.action === 'COMPLETE' && input.location)) {
+        await tx.workOrderEvent.create({
+          data: {
+            tenantId,
+            workOrderId: current.id,
+            eventType: 'work_order.visit_recorded',
+            actorId: actor.userId,
+            metadataJson: {
+              milestone: rule.action === 'ARRIVE' ? 'ARRIVED' : 'DEPARTED',
+              ...(input.location ? locationMetadata(input.location) : {}),
+            } as Prisma.InputJsonValue,
           },
         });
       }
@@ -1044,6 +1131,23 @@ export class WorkOrdersService {
 
 function notFound(message = 'İş emri bulunamadı'): NotFoundException {
   return new NotFoundException({ message, code: 'NOT_FOUND' });
+}
+
+/** Faz 08 — konum metadata'sı (olay akışına güvenli alt küme). */
+function locationMetadata(location: {
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  source: 'GPS' | 'MANUAL';
+  manualReason?: string;
+}): Record<string, unknown> {
+  return {
+    source: location.source,
+    ...(location.latitude !== undefined ? { latitude: location.latitude } : {}),
+    ...(location.longitude !== undefined ? { longitude: location.longitude } : {}),
+    ...(location.accuracyMeters !== undefined ? { accuracyMeters: location.accuracyMeters } : {}),
+    ...(location.manualReason ? { manualReason: location.manualReason } : {}),
+  };
 }
 
 /** Öncelik karşılaştırma (rapor/liste sıralaması yardımcıları). */

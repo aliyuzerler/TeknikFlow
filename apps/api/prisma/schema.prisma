@@ -59,6 +59,13 @@ model User {
   userSkills   UserSkill[]
   teamMembers  TeamMember[]
 
+  // Faz 08 — saha yürütme ilişkileri (aktör rolleri)
+  workOrderVisits     WorkOrderVisit[]     @relation("WorkOrderVisitUser")
+  checklistCompletions WorkOrderChecklistItem[] @relation("ChecklistDoneBy")
+  timeEntries         TimeEntry[]          @relation("TimeEntryUser")
+  filesUploaded       FileObject[]         @relation("FileUploadedBy")
+  signaturesCaptured  WorkOrderSignature[] @relation("SignatureCapturedBy")
+
   @@map("users")
 }
 
@@ -114,6 +121,14 @@ model Tenant {
   teams           Team[]
   teamMembers     TeamMember[]
   categorySkills  ServiceCategorySkill[]
+
+  // Faz 08 — saha yürütme
+  workOrderVisits     WorkOrderVisit[]
+  workOrderChecklistItems WorkOrderChecklistItem[]
+  timeEntries         TimeEntry[]
+  fileObjects         FileObject[]
+  workOrderSignatures WorkOrderSignature[]
+  idempotencyKeys     IdempotencyKey[]
 
   @@map("tenants")
 }
@@ -721,6 +736,13 @@ model WorkOrder {
   events      WorkOrderEvent[]
   notes       WorkOrderNote[]
 
+  // Faz 08 — saha yürütme kanıt artefaktları
+  visits        WorkOrderVisit[]
+  checklistItems WorkOrderChecklistItem[]
+  timeEntries   TimeEntry[]
+  media         FileObject[]
+  signatures    WorkOrderSignature[]
+
   @@unique([tenantId, workOrderNo])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, assignedToId, scheduledStart])
@@ -1013,4 +1035,204 @@ model ServiceCategorySkill {
   @@unique([tenantId, categoryId, skillId])
   @@index([tenantId, categoryId])
   @@map("service_category_skills")
+}
+
+// ---------------------------------------------------------------------------
+// Faz 08 — SAHA YÜRÜTME: GPS varış kayıtları, checklist, çalışma süresi,
+// medya (iki adımlı upload — ADR-0005), imza (ekle-güncelle-yok) ve
+// idempotency anahtarları. Tüm tablolar RLS FORCE (migration'da politika).
+// ---------------------------------------------------------------------------
+
+/// GPS kilometre taşı kaydı — append-only. ON_SITE geçişinde ARRIVED
+/// (konum ZORUNLU: GPS koordinatı ya da manuel onay+neden), COMPLETED
+/// geçişinde DEPARTED (opsiyonel konum). Koordinatlar yoksa null —
+/// manuel onay senaryosunda cihaz izni reddedilmiş olabilir.
+model WorkOrderVisit {
+  id             String          @id @default(uuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  workOrderId    String
+  workOrder      WorkOrder       @relation(fields: [workOrderId], references: [id])
+  userId         String
+  user           User            @relation("WorkOrderVisitUser", fields: [userId], references: [id])
+  milestone      VisitMilestone
+  latitude       Float?
+  longitude      Float?
+  accuracyMeters Float?
+  source         GpsSource       @default(GPS)
+  /// Manuel onay nedeni (izin reddi vb.) — source=MANUAL iken sözleşmede zorunlu.
+  manualReason   String?
+  recordedAt     DateTime        @default(now())
+
+  @@index([tenantId, workOrderId, recordedAt])
+  @@map("work_order_visits")
+}
+
+enum VisitMilestone {
+  ARRIVED
+  DEPARTED
+  @@map("visit_milestone")
+}
+
+enum GpsSource {
+  GPS
+  MANUAL
+  @@map("gps_source")
+}
+
+/// Checklist maddesi — tamamlama durumu satırda; değişiklikler olay
+/// akışına işlenir (work_order.checklist_completed / checklist_reopened).
+/// required=true maddeler eksikken COMPLETED geçişi 409 EVIDENCE_MISSING.
+model WorkOrderChecklistItem {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  label       String
+  detail      String?
+  required    Boolean   @default(true)
+  position    Int       @default(0)
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  doneById    String?
+  doneBy      User?     @relation("ChecklistDoneBy", fields: [doneById], references: [id])
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, workOrderId, position])
+  @@map("work_order_checklist_items")
+}
+
+/// Çalışma süresi kaydı — gerçek işgücü (Faz 06 kapasitesinin sahadaki
+/// karşılığı). Bir kullanıcı bir iş emrinde en fazla bir OPEN kayıt
+/// tutabilir (servis katında denetlenir, 409 TIME_ENTRY_ALREADY_OPEN).
+model TimeEntry {
+  id          String         @id @default(uuid())
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  workOrderId String
+  workOrder   WorkOrder      @relation(fields: [workOrderId], references: [id])
+  userId      String
+  user        User           @relation("TimeEntryUser", fields: [userId], references: [id])
+  type        TimeEntryType
+  startedAt   DateTime
+  endedAt     DateTime?
+  note        String?
+  status      TimeEntryStatus @default(OPEN)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([tenantId, workOrderId, startedAt])
+  @@index([tenantId, userId, status])
+  @@map("time_entries")
+}
+
+enum TimeEntryType {
+  TRAVEL
+  LABOR
+  WAITING
+  @@map("time_entry_type")
+}
+
+enum TimeEntryStatus {
+  OPEN
+  CLOSED
+  @@map("time_entry_status")
+}
+
+/// Medya nesnesi — iki adımlı yükleme (ADR-0005): init (PENDING_UPLOAD +
+/// imzalı PUT URL) → istemci PUT → complete (magic-byte/boyut/MIME
+/// doğrulaması → READY ya da FAILED). objectKey opak UUID, kiracı
+/// önekli; dosya adı YALNIZCA metadata. SVG bilinçli olarak reddedilir.
+model FileObject {
+  id            String     @id @default(uuid())
+  tenantId      String
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  workOrderId   String
+  workOrder     WorkOrder  @relation(fields: [workOrderId], references: [id])
+  kind          MediaKind
+  objectKey     String     @unique
+  fileName      String
+  contentType   String
+  sizeBytes     Int
+  status        FileStatus @default(PENDING_UPLOAD)
+  /// Doğrulama başarısızlığının sınıflı kodu (MAGIC_BYTE_MISMATCH, SIZE_LIMIT…).
+  failureCode   String?
+  uploadedById  String?
+  uploadedBy    User?      @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+  createdAt     DateTime   @default(now())
+  completedAt   DateTime?
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, status])
+  @@map("file_objects")
+}
+
+enum MediaKind {
+  PHOTO
+  VIDEO
+  DOCUMENT
+  @@map("media_kind")
+}
+
+enum FileStatus {
+  PENDING_UPLOAD
+  READY
+  QUARANTINED
+  FAILED
+  @@map("file_status")
+}
+
+/// Müşteri/teknisyen imzası — EKLE-GÜNCELLE-YOK. strokesJson normalize
+/// (0..1) yol koordinatları (SVG DEĞİL — script enjeksiyon yüzeyi yok).
+/// Düzeltme: yeni satır + correctionOfId; eski satırın supersededById
+/// alanı TEK SEFERLİK işaretlenir (asla üstüne yazılmaz, geçmiş kalır).
+model WorkOrderSignature {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  workOrderId    String
+  workOrder      WorkOrder @relation(fields: [workOrderId], references: [id])
+  role           SignatureRole
+  signerName     String
+  strokesJson    Json
+  note           String?
+  capturedById   String?
+  capturedBy     User?     @relation("SignatureCapturedBy", fields: [capturedById], references: [id])
+  signedAt       DateTime
+  /// Düzeltilen imza (aynı iş emrinde) — yeni satır eskiyi işaret eder.
+  correctionOfId String?
+  /// Bu imzayı geçersiz kılan düzeltme satırı (tek seferlik güncellenir).
+  supersededById String?
+  createdAt      DateTime  @default(now())
+
+  @@index([tenantId, workOrderId, createdAt])
+  @@map("work_order_signatures")
+}
+
+enum SignatureRole {
+  CUSTOMER
+  TECHNICIAN
+  @@map("signature_role")
+}
+
+/// Idempotency anahtarı — (kiracı, kullanıcı, anahtar) tekil. Mobil outbox
+/// her işleme UUID anahtar üretir; sunucu tekrarı saklanan yanıtla oynatır
+/// (x-idempotent-replay: true). TTL: expiresAt geçince yeniden işlenir.
+model IdempotencyKey {
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  userId         String
+  key            String
+  endpoint       String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@id([tenantId, userId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }

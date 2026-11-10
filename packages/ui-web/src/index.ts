@@ -102,3 +102,12 @@ export {
   type SegmentedControlProps,
   type SegmentedOption,
 } from './components/segmented-control.js';
+
+// Faz 08: imza tuvali
+export {
+  SignaturePad,
+  sanitizeStrokes,
+  type SignaturePadPoint,
+  type SignaturePadProps,
+  type SignaturePadStroke,
+} from './components/signature-pad.js';

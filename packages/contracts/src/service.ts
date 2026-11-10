@@ -69,6 +69,45 @@ export const NOTE_VISIBILITIES = ['INTERNAL', 'CUSTOMER'] as const;
 export const NoteVisibilitySchema = z.enum(NOTE_VISIBILITIES);
 export type NoteVisibility = z.infer<typeof NoteVisibilitySchema>;
 
+// ------------------------- GPS konumu (Faz 08) -------------------------
+
+/**
+ * GPS kilometre taşı kaydı. Kaynak GPS ise koordinat zorunlu; izin
+ * reddi/çevrimdışı durumunda MANUEL onay + zorunlu neden (koordinatsız
+ * geçilebilir — varış gerçeği yine kayıt altında).
+ */
+export const GpsLocationSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    accuracyMeters: z.number().nonnegative().max(10_000).optional(),
+    capturedAt: z.string().datetime(),
+    source: z.enum(['GPS', 'MANUAL']).default('GPS'),
+    manualReason: z.string().trim().min(2).max(200).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.source === 'GPS' && (value.latitude === undefined || value.longitude === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['latitude'],
+        message: 'GPS kaynağında koordinat zorunlu',
+      });
+    }
+    if (value.source === 'MANUAL' && !value.manualReason) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['manualReason'],
+        message: 'Manuel onay için neden gerekli (ör. konum izni reddedildi)',
+      });
+    }
+  });
+export type GpsLocation = z.infer<typeof GpsLocationSchema>;
+
+export const GPS_SOURCE_LABELS: Readonly<Record<'GPS' | 'MANUAL', string>> = {
+  GPS: 'Cihaz GPS',
+  MANUAL: 'Manuel onay',
+};
+
 // ------------------------- SLA politikası -------------------------
 
 /** Öncelik başına çözüm süresi (dakika) — kiracı bazlı, varsayılanlarla gelir. */
@@ -253,6 +292,9 @@ export type UpdateWorkOrderRequest = z.infer<typeof UpdateWorkOrderRequestSchema
  * Parametreler hedef duruma göre: ASSIGNED → assigneeUserId;
  * PLANNED → scheduledStart/scheduledEnd/branchId; CANCELLED → reasonCode+note.
  * Faz 06: ASSIGNED hedefinde çakışma denetimi (override alanları opsiyonel).
+ * Faz 08: location — GPS kilometre taşı. ON_SITE (ARRIVE) için ZORUNLU:
+ * cihaz GPS'i ya da manuel onay + neden; varış work_order_visits'a yazılır.
+ * COMPLETED'ta ayrılış konumu opsiyonel; diğer geçişlerde olay metadata'sında.
  */
 export const TransitionWorkOrderRequestSchema = z
   .object({
@@ -266,6 +308,7 @@ export const TransitionWorkOrderRequestSchema = z
     overrideConflict: z.boolean().optional(),
     overrideReason: z.string().trim().min(10).max(500).optional(),
     expectedVersion: z.number().int().nonnegative().optional(),
+    location: GpsLocationSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.to === 'ASSIGNED' && !value.assigneeUserId) {
@@ -277,6 +320,13 @@ export const TransitionWorkOrderRequestSchema = z
     }
     if (value.to === 'CANCELLED' && !value.reasonCode) {
       ctx.addIssue({ code: 'custom', path: ['reasonCode'], message: 'İptal nedeni gerekli' });
+    }
+    if (value.to === 'ON_SITE' && !value.location) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['location'],
+        message: 'Varış kaydı gerekli: GPS konumu ya da manuel onay+neden',
+      });
     }
     if (
       value.to === 'PLANNED' &&

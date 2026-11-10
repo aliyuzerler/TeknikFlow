@@ -9,13 +9,16 @@ import {
 } from '@react-navigation/native-stack';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { createRef } from 'react';
-import type { WorkOrderView } from '@teknikflow/contracts';
+import type { ExecutionReportView, WorkOrderView } from '@teknikflow/contracts';
 import type { MobileApiClient } from '../api/client';
+import type { OutboxRepo } from '../cache/outbox-repo';
 import type { WorkOrderCache } from '../cache/work-order-cache';
 import { AccountScreen } from '../screens/account-screen';
 import { InboxScreen } from '../screens/inbox-screen';
 import { LoginScreen } from '../screens/login-screen';
 import { WorkOrderDetailScreen } from '../screens/work-order-detail-screen';
+import { createExecutionActions } from '../screens/execution-actions';
+import { expoLocationProvider } from '../location/expo-location-provider';
 import { useSession } from '../session/session-context';
 import { useSync } from '../sync/sync-context';
 import { theme } from '../theme';
@@ -25,7 +28,12 @@ import { linking, type RootStackParamList } from './linking';
  * Faz 07 — kök gezgin. Oturum durumuna göre giriş ya da uygulama akışı;
  * booting'de dürüst yükleme ekranı. Bildirim yönlendirmesi linking ile
  * (tfmobile://wo/{id} → WorkOrderDetail).
+ *
+ * Faz 08 — detay ekranına saha yürütme bağlanır: eylemler outbox'a,
+ * rapor çevrimiçiyse çekilir.
  */
+
+import type { LocationProvider } from '../location/gps';
 
 export type RootStackProps = NativeStackNavigationProp<RootStackParamList>;
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,10 +45,24 @@ export interface RootNavigatorProps {
   api: MobileApiClient;
   cache: WorkOrderCache;
   identity: { userId: string; tenantId: string } | null;
+  /** Faz 08: saha eylemlerinin kuyruğu (senkron servisiyle aynı repo). */
+  outbox?: OutboxRepo;
+  /** Faz 08: kuyruk boşaltma (senkron servisin drainOutbox'u). */
+  drainOutbox?: () => Promise<{ sent: number; failed: number }>;
+  /** Faz 08: konum sağlayıcı (varsayılan expo-location). */
+  locationProvider?: LocationProvider;
 }
 
-export function RootNavigator({ api, cache, identity }: RootNavigatorProps) {
+export function RootNavigator({
+  api,
+  cache,
+  identity,
+  outbox,
+  drainOutbox,
+  locationProvider,
+}: RootNavigatorProps) {
   const session = useSession();
+  const sync = useSync();
 
   if (session.status === 'booting') {
     return <BootScreen />;
@@ -70,6 +92,26 @@ export function RootNavigator({ api, cache, identity }: RootNavigatorProps) {
             getOrder={getOrder}
             workOrderId={(route.params as { workOrderId: string }).workOrderId}
             onBack={() => navigationRef.current?.goBack()}
+            execution={
+              outbox && drainOutbox
+                ? {
+                    actions: createExecutionActions({
+                      api,
+                      outbox,
+                      identity: () => Promise.resolve(identity),
+                      isOnline: () => sync.isOnline,
+                      drain: drainOutbox,
+                      captureLocation: locationProvider ?? expoLocationProvider,
+                    }),
+                    isOnline: () => sync.isOnline,
+                    pendingCount: () => outbox.countPending(identity?.userId ?? ''),
+                    getReport: async (id: string): Promise<ExecutionReportView | null> => {
+                      const result = await api.getExecutionReport(id);
+                      return result.ok ? result.data : null;
+                    },
+                  }
+                : undefined
+            }
           />
         )}
       </Stack.Screen>

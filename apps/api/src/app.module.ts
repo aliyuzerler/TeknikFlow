@@ -12,6 +12,7 @@ import { PlatformModule } from './platform/platform.module.js';
 import { CrmModule } from './crm/crm.module.js';
 import { ServiceModule } from './service/service.module.js';
 import { DispatchModule } from './dispatch/dispatch.module.js';
+import { ExecutionModule } from './execution/execution.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { DispatchModule } from './dispatch/dispatch.module.js';
     CrmModule,
     ServiceModule,
     DispatchModule,
+    ExecutionModule,
     HealthModule,
   ],
 })

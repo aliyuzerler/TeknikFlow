@@ -19,6 +19,7 @@ import {
 } from '@teknikflow/ui-web/server';
 import { WorkOrderActions } from './work-order-actions';
 import { EditWorkOrderButton } from './edit-work-order';
+import { ExecutionPanel } from './execution-panel';
 import { NoteForm } from './note-form';
 
 export const metadata = { title: 'İş Emri — TeknikFlow' };
@@ -205,6 +206,22 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           isAssignee={isAssignee}
           branches={branches?.data ?? []}
         />
+
+        {/* Faz 08 — saha yürütme: checklist + süre + imza */}
+        <ExecutionPanel
+          workOrderId={workOrder.workOrderId}
+          status={workOrder.status}
+          permissions={permissions}
+          isAssignee={isAssignee}
+        />
+
+        <Panel title="Yürütme kanıtları" headingLevel={2}>
+          <p className="tf-panel__subtitle" style={{ marginTop: 0 }}>
+            Varış/GPS, checklist, süre, medya ve imza kayıtlarının tamamı yürütme raporunda
+            birleşir.
+          </p>
+          <a href={`/app/work-orders/${workOrder.workOrderId}/report`}>Raporu görüntüle →</a>
+        </Panel>
 
         <Panel title="Notlar" headingLevel={2} subtitle={`${workOrder.notes.length} not`}>
           {workOrder.notes.length === 0 ? (

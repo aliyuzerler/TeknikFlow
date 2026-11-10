@@ -80,6 +80,38 @@ interface AssignableUser {
   roleName: string;
 }
 
+interface GpsLocationInput {
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  capturedAt: string;
+  source: 'GPS' | 'MANUAL';
+  manualReason?: string;
+}
+
+/** Tarayıcı konumu — izin reddi/çevrimdışıda null (manuel geri dönüş). */
+function browserLocation(): Promise<GpsLocationInput | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracyMeters: position.coords.accuracy ?? undefined,
+          capturedAt: new Date(position.timestamp).toISOString(),
+          source: 'GPS',
+        });
+      },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
+    );
+  });
+}
+
 export function WorkOrderActions({
   workOrderId,
   status,
@@ -112,6 +144,11 @@ export function WorkOrderActions({
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[] | null>(null);
   const [reasonCode, setReasonCode] = useState<CancellationReason>('CUSTOMER_REQUEST');
   const [cancelNote, setCancelNote] = useState('');
+  // Faz 08 — varış (GPS) çekmecesi.
+  const [arriveOpen, setArriveOpen] = useState(false);
+  const [arriveLocation, setArriveLocation] = useState<GpsLocationInput | null>(null);
+  const [arriveLocating, setArriveLocating] = useState(false);
+  const [manualReason, setManualReason] = useState('');
 
   const has = (permission: string) => permissions.includes(permission);
   const create = has('work_orders:create');
@@ -158,6 +195,8 @@ export function WorkOrderActions({
       const payload = (await response.json().catch(() => ({}))) as {
         message?: string;
         code?: string;
+        missing?: Array<{ itemId: string; label: string }>;
+        details?: { gate?: string; signatureCount?: number };
       };
       if (!response.ok) {
         if (payload.code === 'VERSION_CONFLICT') {
@@ -166,6 +205,16 @@ export function WorkOrderActions({
         } else if (payload.code === 'INVALID_TRANSITION') {
           setError('Bu geçiş artık izinli değil — sayfa yenileniyor.');
           router.refresh();
+        } else if (payload.code === 'EVIDENCE_MISSING') {
+          // Faz 08 kanıt kapıları: eksiklerin dürüst listesi.
+          const missingLabels = (payload.missing ?? []).map((item) => item.label).join(', ');
+          setError(
+            payload.details?.gate === 'CLOSED'
+              ? 'Kapatma için en az bir imza gerekli — imza panelinden müşteri imzasını alın.'
+              : missingLabels
+                ? `Zorunlu checklist maddeleri eksik: ${missingLabels}`
+                : 'Kanıt eksik — iş tamamlanamıyor.',
+          );
         } else {
           setError(payload.message ?? 'Geçiş başarısız');
         }
@@ -214,6 +263,42 @@ export function WorkOrderActions({
       ...(cancelNote.trim() ? { note: cancelNote.trim() } : {}),
     });
     if (ok) setCancelOpen(false);
+  }
+
+  async function handleArriveOpen() {
+    setArriveOpen(true);
+    setArriveLocation(null);
+    setManualReason('');
+    setArriveLocating(true);
+    const location = await browserLocation();
+    setArriveLocation(
+      location ?? {
+        capturedAt: new Date().toISOString(),
+        source: 'MANUAL',
+        manualReason: '',
+      },
+    );
+    setArriveLocating(false);
+  }
+
+  async function handleArriveConfirm() {
+    const location: GpsLocationInput | null = arriveLocation;
+    if (!location) {
+      setError('Konum hazırlanıyor — tekrar deneyin');
+      return;
+    }
+    if (location.source === 'MANUAL' && manualReason.trim().length < 2) {
+      setError('Manuel onay için neden gerekli (ör. konum izni reddedildi)');
+      return;
+    }
+    const ok = await transition({
+      to: 'ON_SITE',
+      location:
+        location.source === 'MANUAL'
+          ? { capturedAt: location.capturedAt, source: 'MANUAL', manualReason: manualReason.trim() }
+          : location,
+    });
+    if (ok) setArriveOpen(false);
   }
 
   // Atama çekmecesi açılınca atanabilir kullanıcıları çek.
@@ -281,6 +366,18 @@ export function WorkOrderActions({
                 variant="primary"
                 disabled={busy}
                 onClick={() => setAssignOpen(true)}
+              >
+                {label}
+              </Button>
+            );
+          }
+          if (transitionRule.action === 'ARRIVE') {
+            return (
+              <Button
+                key={transitionRule.action}
+                variant="primary"
+                disabled={busy}
+                onClick={() => void handleArriveOpen()}
               >
                 {label}
               </Button>
@@ -400,6 +497,62 @@ export function WorkOrderActions({
             </Button>
           </div>
         </form>
+      </SideDrawer>
+
+      {/* Faz 08 — Varış (GPS) çekmecesi */}
+      <SideDrawer open={arriveOpen} onClose={() => setArriveOpen(false)} title="Varış bildir">
+        <p className="tf-panel__subtitle" style={{ marginTop: 0 }}>
+          Varış kaydı GPS kilometre taşıdır: konum izni reddedildiyse manuel onay + zorunlu nedenle
+          devam edin (koordinat olmadan da kayıt düşer).
+        </p>
+        {arriveLocating ? <p className="tf-panel__subtitle">Konum alınıyor…</p> : null}
+        {arriveLocation?.source === 'GPS' ? (
+          <div
+            style={{
+              border: '1px solid var(--tf-border)',
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 12,
+            }}
+          >
+            <strong style={{ fontSize: 14 }}>Cihaz konumu hazır</strong>
+            <p className="tf-panel__subtitle" style={{ margin: '4px 0 0' }}>
+              {arriveLocation.latitude?.toFixed(5)}, {arriveLocation.longitude?.toFixed(5)} · ±
+              {Math.round(arriveLocation.accuracyMeters ?? 0)} m doğruluk
+            </p>
+          </div>
+        ) : arriveLocation ? (
+          <Alert variant="warning" title="Konum alınamadı">
+            Tarayıcı konum izni vermedi ya da sinyal yok — manuel onayla devam edin.
+          </Alert>
+        ) : null}
+        {arriveLocation?.source === 'MANUAL' ? (
+          <FormField label="Manuel onay nedeni">
+            {(ids) => (
+              <input
+                {...ids}
+                value={manualReason}
+                onChange={(e) => setManualReason(e.target.value)}
+                maxLength={200}
+                placeholder="ör. Konum izni reddedildi"
+                style={{ width: '100%' }}
+              />
+            )}
+          </FormField>
+        ) : null}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+          <Button type="button" variant="secondary" onClick={() => setArriveOpen(false)}>
+            Vazgeç
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={busy || arriveLocating}
+            onClick={() => void handleArriveConfirm()}
+          >
+            {busy ? 'Kaydediliyor…' : 'Varışı kaydet'}
+          </Button>
+        </div>
       </SideDrawer>
 
       {/* İptal çekmecesi */}

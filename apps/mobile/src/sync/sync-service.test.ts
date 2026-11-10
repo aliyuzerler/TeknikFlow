@@ -143,7 +143,7 @@ describe('sync-service.pullWorkOrders', () => {
 });
 
 describe('sync-service.drainOutbox', () => {
-  it('Faz 07 operasyon seti boş: no-op, kuyruk bozulmaz', async () => {
+  it('bilinmeyen işlem kalıcı reddi: failed=1, satır 24 saat donar', async () => {
     const api = stubApi(() => ({ status: 200 }));
     const deps = makeDeps(api);
     const service = createSyncService(deps);
@@ -154,12 +154,14 @@ describe('sync-service.drainOutbox', () => {
       userId: USER,
       entityId: 'e1',
       baseVersion: 1,
-      operation: 'work_order.note_append',
+      operation: 'work_order.note_append', // Faz 08 kataloğunda yok
       payload: {},
     });
     const result = await service.drainOutbox();
-    expect(result).toEqual({ sent: 0, failed: 0 });
-    // Satır hâlâ kuyrukta (Faz 08 yürütücüsü bağlanana kadar).
+    expect(result).toEqual({ sent: 0, failed: 1 });
+    // Satır kuyrukta kalır ama nextAttemptAt 24 saat ileri — yeniden denenmez.
+    const pending = await deps.outbox.pending(USER, new Date(Date.now() + 23 * 3600_000));
+    expect(pending).toHaveLength(0);
     expect(await deps.outbox.countPending(USER)).toBe(1);
   });
 });

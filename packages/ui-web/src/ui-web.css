@@ -1681,3 +1681,71 @@
   outline: 2px solid var(--tf-focus, #4c9ffe);
   outline-offset: 1px;
 }
+
+/* ---------- Faz 08: İmza tuvali ---------- */
+.tf-signature {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-1);
+}
+
+.tf-signature__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tf-space-2);
+}
+
+.tf-signature__label {
+  font-size: var(--tf-text-sm);
+  font-weight: 700;
+  color: var(--tf-text-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tf-signature__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--tf-blue-700);
+  font: inherit;
+  font-size: var(--tf-text-sm);
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--tf-radius-sm);
+  cursor: pointer;
+}
+
+.tf-signature__clear:hover:not(:disabled) {
+  background: var(--tf-surface-alt);
+}
+
+.tf-signature__clear:disabled {
+  color: var(--tf-placeholder);
+  cursor: not-allowed;
+}
+
+.tf-signature__canvas {
+  width: 100%;
+  display: block;
+  border: 1px dashed var(--tf-border);
+  border-radius: var(--tf-radius-sm);
+  background: var(--tf-surface);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.tf-signature__canvas:focus-visible {
+  outline: none;
+  border-color: var(--tf-blue-600);
+  box-shadow: var(--tf-focus-ring);
+}
+
+.tf-signature__hint {
+  margin: 0;
+  font-size: var(--tf-text-xs);
+  color: var(--tf-muted);
+}
