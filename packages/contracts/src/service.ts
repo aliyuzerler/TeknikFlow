@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GpsLocationSchema } from './execution.js';
 
 /**
  * Faz 05 — servis sözleşmeleri: servis talebi (intake), iş emri yaşam
@@ -253,6 +254,9 @@ export type UpdateWorkOrderRequest = z.infer<typeof UpdateWorkOrderRequestSchema
  * Parametreler hedef duruma göre: ASSIGNED → assigneeUserId;
  * PLANNED → scheduledStart/scheduledEnd/branchId; CANCELLED → reasonCode+note.
  * Faz 06: ASSIGNED hedefinde çakışma denetimi (override alanları opsiyonel).
+ * Faz 08: ON_SITE (varış) ve COMPLETED (tamamlama) hedeflerinde opsiyonel GPS
+ * konumu — açık check-in/check-out eylemi (rules/06). Konum YOKSA geçiş
+ * yine mümkündür; sunucu visit kaydını MANUAL kaynakla üretir.
  */
 export const TransitionWorkOrderRequestSchema = z
   .object({
@@ -266,6 +270,8 @@ export const TransitionWorkOrderRequestSchema = z
     overrideConflict: z.boolean().optional(),
     overrideReason: z.string().trim().min(10).max(500).optional(),
     expectedVersion: z.number().int().nonnegative().optional(),
+    /** Faz 08 — GPS kilometre taşı (yalnız varış/tamamlama geçişlerinde). */
+    location: GpsLocationSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.to === 'ASSIGNED' && !value.assigneeUserId) {
@@ -288,6 +294,13 @@ export const TransitionWorkOrderRequestSchema = z
         code: 'custom',
         path: ['scheduledEnd'],
         message: 'Bitiş zamanı başlangıçtan sonra olmalı',
+      });
+    }
+    if (value.location && value.to !== 'ON_SITE' && value.to !== 'COMPLETED') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['location'],
+        message: 'Konum yalnız varış (ON_SITE) ve tamamlama (COMPLETED) geçişlerinde kabul edilir',
       });
     }
   });

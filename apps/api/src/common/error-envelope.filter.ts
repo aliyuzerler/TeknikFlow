@@ -43,6 +43,8 @@ export interface ErrorEnvelope {
     workOrderId: string | null;
     workOrderNo: string | null;
   }>;
+  /** Faz 08: 409 EVIDENCE_MISSING — yanıtlanmamış zorunlu checklist maddeleri. */
+  missing?: Array<{ id: string; label: string }>;
 }
 
 function readRequestId(request: Request): string {
@@ -78,6 +80,8 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
     const details = extractSafeDetails(body);
     // Faz 06: planlama çakışması bulguları (aynı kiracının iş emirleri).
     const conflicts = extractConflicts(body);
+    // Faz 08: kanıt eksiği maddeleri (aynı kiracının checklist'i).
+    const missing = extractMissing(body);
     return {
       code,
       message,
@@ -86,6 +90,7 @@ function mapException(exception: unknown, requestId: string): ErrorEnvelope {
       ...(fieldErrors ? { fieldErrors } : {}),
       ...(details ? { details } : {}),
       ...(conflicts ? { conflicts } : {}),
+      ...(missing ? { missing } : {}),
     };
   }
 
@@ -160,6 +165,28 @@ function extractConflicts(body: string | object): ErrorEnvelope['conflicts'] | u
         workOrderId: record.workOrderId as string | null,
         workOrderNo: record.workOrderNo as string | null,
       });
+    }
+  }
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+/**
+ * Faz 08 — EVIDENCE_MISSING gövdesindeki zorunlu checklist maddeleri:
+ * yalnız iyi biçimli id+label satırları taşınır (kendi kiracısının
+ * checklist'i; beyin liste dışı alan geçmez).
+ */
+function extractMissing(body: string | object): ErrorEnvelope['missing'] | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  if (!('missing' in body) || !Array.isArray((body as { missing?: unknown }).missing)) {
+    return undefined;
+  }
+  const rows = (body as { missing: unknown[] }).missing;
+  const parsed: NonNullable<ErrorEnvelope['missing']> = [];
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const record = row as Record<string, unknown>;
+    if (typeof record.id === 'string' && typeof record.label === 'string') {
+      parsed.push({ id: record.id, label: record.label });
     }
   }
   return parsed.length > 0 ? parsed : undefined;

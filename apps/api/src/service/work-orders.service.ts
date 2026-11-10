@@ -28,6 +28,12 @@ import type { TransitionAuthority } from './work-order-state.js';
 import { requireTransitionRule, transitionEffects } from './work-order-state.js';
 import { ScheduleConflictService } from './schedule-conflict.service.js';
 import { computeSlaDueAt, defaultResolveMinutes } from './sla.js';
+import {
+  hasCustomerSignatures,
+  missingRequiredChecklist,
+  visitDataFromLocation,
+} from '../execution/execution-rules.js';
+import { EVIDENCE_MISSING_CODE } from '@teknikflow/contracts';
 import { slaState } from './dispatch-engine.js';
 
 /**
@@ -579,6 +585,36 @@ export class WorkOrdersService {
         });
       }
 
+      // Faz 08 — KANIT KAPILARI (ADR-0007/OFFLINE_SYNC.md):
+      // COMPLETE: zorunlu checklist maddeleri yanıtlanmış olmalı.
+      // CLOSE:    en az bir MÜŞTERİ imzası bulunmalı (müşteri onayı).
+      if (rule.action === 'COMPLETE') {
+        const items = await tx.checklistItem.findMany({
+          where: { workOrderId: current.id },
+          select: { id: true, label: true, required: true, responseValue: true },
+        });
+        const missing = missingRequiredChecklist(items);
+        if (missing.length > 0) {
+          throw new ConflictException({
+            message: 'Tamamlama için zorunlu checklist maddeleri yanıtlanmamış',
+            code: EVIDENCE_MISSING_CODE,
+            missing,
+          });
+        }
+      }
+      if (rule.action === 'CLOSE') {
+        const signatures = await tx.workOrderSignature.findMany({
+          where: { workOrderId: current.id },
+          select: { signedBy: true },
+        });
+        if (!hasCustomerSignatures(signatures)) {
+          throw new ConflictException({
+            message: 'Kapatma için en az bir müşteri imzası gerekli',
+            code: EVIDENCE_MISSING_CODE,
+          });
+        }
+      }
+
       // Eyleme özgü doğrulama ve yan veriler.
       const extra: Prisma.WorkOrderUpdateInput = {};
       const eventMetadata: Record<string, unknown> = { action: rule.action };
@@ -676,6 +712,44 @@ export class WorkOrdersService {
         data,
         include: WO_INCLUDE,
       })) as WorkOrderRow;
+
+      // Faz 08 — GPS kilometre taşları: ARRIVE → CHECK_IN, COMPLETE →
+      // CHECK_OUT (append-only visit). Konum yoksa MANUAL kaynakla kayıt
+      // (izin reddi / cihaz fallback'i — açık eylem yine denetlenir).
+      if (rule.action === 'ARRIVE' || rule.action === 'COMPLETE') {
+        const visitType = rule.action === 'ARRIVE' ? 'CHECK_IN' : 'CHECK_OUT';
+        const visit = visitDataFromLocation(input.location, visitType);
+        const visitRow = await tx.workOrderVisit.create({
+          data: {
+            tenantId,
+            workOrderId: current.id,
+            visitType: visit.visitType,
+            latitude: visit.latitude,
+            longitude: visit.longitude,
+            accuracyMeters: visit.accuracyMeters,
+            source: visit.source,
+            manualReason: visit.manualReason,
+            capturedAt: visit.capturedAt,
+            recordedById: actor.userId,
+          },
+        });
+        await tx.workOrderEvent.create({
+          data: {
+            tenantId,
+            workOrderId: current.id,
+            eventType: rule.action === 'ARRIVE' ? 'work_order.check_in' : 'work_order.check_out',
+            fromState: current.status,
+            toState: input.to,
+            actorId: actor.userId,
+            metadataJson: {
+              visitId: visitRow.id,
+              source: visit.source,
+              hasCoordinates: visit.latitude !== null,
+              accuracyMeters: visit.accuracyMeters,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
 
       // Zaman çizelgesi: durum değişimi + eyleme özgü olaylar.
       await tx.workOrderEvent.create({

@@ -250,6 +250,29 @@ describe('tam yaşam döngüsü (izinli geçişler uçtan uca)', () => {
     expect(closeAttempt.status).toBe(403);
     expect(closeAttempt.body.code).toBe('FORBIDDEN');
 
+    // Faz 08 — kanıt kapısı: müşteri imzası olmadan kapatma 409 EVIDENCE_MISSING.
+    // (Kanal tümceliği: tamamlandıktan SONRA, kapanmadan ÖNCE imza toplanır.)
+    const blockedClose = await transition(owner, workOrderId, { to: 'CLOSED' });
+    expect(blockedClose.status).toBe(409);
+    expect(blockedClose.body.code).toBe('EVIDENCE_MISSING');
+
+    // Müşteri imzası toplanır (teknisyen signature:capture yetkisiyle).
+    await authed(tech1.cookies)
+      .post(`/api/v1/work-orders/${workOrderId}/signatures`)
+      .send({
+        signedBy: 'CUSTOMER',
+        signerName: 'İmza Sahibi',
+        strokes: [
+          [
+            { x: 5, y: 12 },
+            { x: 55, y: 14 },
+            { x: 90, y: 20 },
+          ],
+        ],
+        capturedAt: '2026-11-10T10:00:00.000Z',
+      })
+      .expect(201);
+
     response = await transition(owner, workOrderId, { to: 'CLOSED' });
     expect(response.status).toBe(201);
     expect(response.body.closedAt).toBeTruthy();

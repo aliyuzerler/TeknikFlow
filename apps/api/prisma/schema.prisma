@@ -59,6 +59,13 @@ model User {
   userSkills   UserSkill[]
   teamMembers  TeamMember[]
 
+  // Faz 08 — saha yürütme ilişkileri (GPS/işçilik/medya/imza aktörleri)
+  workOrderVisitsRecorded WorkOrderVisit[] @relation("WorkOrderVisitRecorder")
+  checklistResponsesMade  ChecklistItem[]  @relation("ChecklistResponder")
+  workOrderTimeEntries    WorkOrderTimeEntry[] @relation("WorkOrderTimeEntryUser")
+  fileObjectsUploaded     FileObject[]      @relation("FileObjectUploader")
+  signaturesCaptured      WorkOrderSignature[] @relation("SignatureCapturer")
+
   @@map("users")
 }
 
@@ -114,6 +121,15 @@ model Tenant {
   teams           Team[]
   teamMembers     TeamMember[]
   categorySkills  ServiceCategorySkill[]
+
+  // Faz 08 — saha yürütme
+  workOrderVisits     WorkOrderVisit[]
+  checklistItems      ChecklistItem[]
+  workOrderTimeEntries WorkOrderTimeEntry[]
+  fileObjects         FileObject[]
+  workOrderAttachments WorkOrderAttachment[]
+  workOrderSignatures  WorkOrderSignature[]
+  idempotencyKeys     IdempotencyKey[]
 
   @@map("tenants")
 }
@@ -721,6 +737,13 @@ model WorkOrder {
   events      WorkOrderEvent[]
   notes       WorkOrderNote[]
 
+  // Faz 08 — saha yürütme kanıtları
+  visits        WorkOrderVisit[]
+  checklistItems ChecklistItem[]
+  timeEntries   WorkOrderTimeEntry[]
+  attachments   WorkOrderAttachment[]
+  signatures    WorkOrderSignature[]
+
   @@unique([tenantId, workOrderNo])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, assignedToId, scheduledStart])
@@ -1013,4 +1036,220 @@ model ServiceCategorySkill {
   @@unique([tenantId, categoryId, skillId])
   @@index([tenantId, categoryId])
   @@map("service_category_skills")
+}
+
+// ---------------------------------------------------------------------------
+// Faz 08 — SAHA YÜRÜTME: GPS ziyaretleri, checklist, işçilik, medya, imza,
+// idempotency. Tüm tablolar RLS FORCE (migration SQL'de politika).
+// ---------------------------------------------------------------------------
+
+/// GPS kilometre taşı — APPEND-ONLY. ARRIVE (→ON_SITE) geçişinde CHECK_IN,
+/// COMPLETE (→COMPLETED) geçişinde CHECK_OUT üretilir. Konum paylaşılmadıysa
+/// source=MANUAL ve koordinatlar boş (izin reddi cihaz fallback'i).
+model WorkOrderVisit {
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  workOrderId    String
+  workOrder      WorkOrder     @relation(fields: [workOrderId], references: [id])
+  visitType      VisitType
+  latitude       Float?
+  longitude      Float?
+  /// Cihaz doğruluğu (metre) — GPS kaynağında dolu.
+  accuracyMeters Float?
+  source         GpsSource
+  manualReason   String?
+  /// İstemci yakalama zamanı (UTC).
+  capturedAt     DateTime?
+  recordedById   String?
+  recordedBy     User?         @relation("WorkOrderVisitRecorder", fields: [recordedById], references: [id])
+  recordedAt     DateTime      @default(now())
+
+  @@index([tenantId, workOrderId, recordedAt])
+  @@map("work_order_visits")
+}
+
+enum VisitType {
+  CHECK_IN
+  CHECK_OUT
+  @@map("visit_type")
+}
+
+enum GpsSource {
+  GPS
+  MANUAL
+  @@map("gps_source")
+}
+
+/// Checklist maddesi — yanıt değeri JSON; tipe göre doğrulama API'de
+/// (work-order checklist servisi). Yanıt alan-düzeyi güncellenir; append-only
+/// geçmiş gerekmiyordur (taslak birleştirme politikası ADR-0004).
+model ChecklistItem {
+  id            String               @id @default(uuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  workOrderId   String
+  workOrder     WorkOrder            @relation(fields: [workOrderId], references: [id])
+  label         String
+  responseType  ChecklistResponseType
+  required      Boolean              @default(false)
+  /// Seçim tiplerinde seçenek listesi (string[]).
+  optionsJson   Json?
+  sortOrder     Int                  @default(0)
+  /// Yanıt değeri — tip responseObjectType'a göre doğrulanır.
+  responseValue Json?
+  respondedAt   DateTime?
+  respondedById String?
+  respondedBy   User?                @relation("ChecklistResponder", fields: [respondedById], references: [id])
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([tenantId, workOrderId, sortOrder])
+  @@map("work_order_checklist_items")
+}
+
+enum ChecklistResponseType {
+  BOOLEAN
+  NUMBER
+  TEXT
+  SINGLE_SELECT
+  MULTI_SELECT
+  @@map("checklist_response_type")
+}
+
+/// İşçilik (labor) kaydı — süre sunucuda türetilir; istemci yazamaz.
+model WorkOrderTimeEntry {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  userId      String
+  user        User      @relation("WorkOrderTimeEntryUser", fields: [userId], references: [id])
+  startedAt   DateTime
+  endedAt     DateTime
+  note        String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, workOrderId, startedAt])
+  @@map("work_order_time_entries")
+}
+
+/// Medya nesnesi — ADR-0005: opak nesne anahtarı (UUID), karantina durumu,
+/// magic-byte doğrulama sonrası checksum. Bucket asla herkese açık değil.
+model FileObject {
+  id              String         @id @default(uuid())
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  /// Opak S3 nesne anahtarı: tenant prefiksli UUID — path traversal yok.
+  objectKey       String         @unique
+  kind            AttachmentKind
+  /// Kullanıcı dosya adı — yalnızca metadata (anahtarda kullanılmaz).
+  fileName        String
+  contentType     String
+  sizeBytes       Int
+  caption         String?
+  state           FileObjectState @default(PENDING_UPLOAD)
+  /// İçerik bütünlüğü — complete adımında hesaplanır.
+  checksumSha256  String?
+  rejectionReason String?
+  uploadedById    String?
+  uploadedBy      User?          @relation("FileObjectUploader", fields: [uploadedById], references: [id])
+  createdAt       DateTime       @default(now())
+  completedAt     DateTime?
+
+  attachments     WorkOrderAttachment[]
+
+  @@index([tenantId, createdAt])
+  @@map("file_objects")
+}
+
+enum AttachmentKind {
+  PHOTO
+  VIDEO
+  DOCUMENT
+  @@map("attachment_kind")
+}
+
+enum FileObjectState {
+  /// init yapıldı, ikili yüklenmedi.
+  PENDING_UPLOAD
+  /// Yüklendi — doğrulama bekliyor (karantina).
+  UPLOADED
+  /// Doğrulandı, imzalı URL ile erişilebilir.
+  READY
+  /// Doğrulama başarısız — erişilemez kalır.
+  REJECTED
+  @@map("file_object_state")
+}
+
+/// İş emri ↔ medya bağlantısı — kanıt ilişkisi.
+model WorkOrderAttachment {
+  id           String     @id @default(uuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  workOrderId  String
+  workOrder    WorkOrder  @relation(fields: [workOrderId], references: [id])
+  fileObjectId String
+  fileObject   FileObject @relation(fields: [fileObjectId], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@unique([tenantId, workOrderId, fileObjectId])
+  @@index([tenantId, workOrderId])
+  @@map("work_order_attachments")
+}
+
+/// İmza — APPEND-ONLY. Ham koordinat yolları (strokes) JSON; SVG/PNG payload
+/// yüzeyi yok. Düzeltme imzası correctionOfId ile öncekine bağlanır; hiçbir
+/// imza güncellenmez/silinmez (OFFLINE_SYNC.md çatışma politikası).
+model WorkOrderSignature {
+  id             String             @id @default(uuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  workOrderId    String
+  workOrder      WorkOrder          @relation(fields: [workOrderId], references: [id])
+  signedBy       SignatoryRole
+  signerName     String
+  /// Stroke dizisi: Array<Array<{x:number,y:number}>>.
+  strokesJson    Json
+  capturedAt     DateTime
+  note           String?
+  /// Düzeltme imzasıysa düzelttiği imza (üzerine yazma YOK).
+  correctionOfId String?
+  correctionOf   WorkOrderSignature? @relation("SignatureCorrection", fields: [correctionOfId], references: [id])
+  corrections    WorkOrderSignature[] @relation("SignatureCorrection")
+  capturedById   String?
+  capturedBy     User?              @relation("SignatureCapturer", fields: [capturedById], references: [id])
+  createdAt      DateTime           @default(now())
+
+  @@index([tenantId, workOrderId, createdAt])
+  @@map("work_order_signatures")
+}
+
+enum SignatoryRole {
+  CUSTOMER
+  TECHNICIAN
+  @@map("signatory_role")
+}
+
+/// Idempotency anahtarı — (kiracı, kullanıcı, kapsam, anahtar) tekil. Yanıt
+/// saklanır; aynı anahtarın tekrarı saklı yanıtı döner (mobil outbox dedupe).
+/// Farklı gövdeyle aynı anahtar → 409 IDEMPOTENCY_KEY_CONFLICT.
+model IdempotencyKey {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  userId       String
+  /// Uç ayrıştırıcısı (örn. "labor.create") — anahtar kapsam başına tekil.
+  scope        String
+  key          String
+  /// Gövde SHA-256 özeti — tekilleştirme tutarlılık denetimi.
+  requestHash  String
+  responseJson Json
+  statusCode   Int
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, userId, scope, key])
+  @@index([tenantId, createdAt])
+  @@map("idempotency_keys")
 }
